@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>咖啡豆库存管理 - 原型预览</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f3f4f6; }
+        .coffee-brown { color: #8b4513; }
+        .bg-coffee-brown { background-color: #8b4513; }
+    </style>
+</head>
+<body>
+    <div id="app" class="max-w-md mx-auto min-h-screen pb-20">
+        <!-- Header -->
+        <header class="bg-white p-4 shadow-sm sticky top-0 z-10">
+            <div class="flex justify-between items-center">
+                <h1 class="text-xl font-bold coffee-brown">{{ currentTab === 'inventory' ? '我的咖啡豆' : '品饮记录' }}</h1>
+                <button v-if="currentTab === 'inventory'" @click="showAddBean = true" class="bg-coffee-brown text-white px-3 py-1 rounded-full text-sm">+ 新增</button>
+            </div>
+        </header>
+
+        <!-- Inventory List -->
+        <main v-if="currentTab === 'inventory'" class="p-4">
+            <div v-if="beans.length === 0" class="text-center mt-20 text-gray-400">
+                暂无咖啡豆，请点击右上角添加
+            </div>
+            <div v-for="bean in beans" :key="bean.id" class="bg-white rounded-lg p-4 mb-4 shadow-sm" @click="openActionSheet(bean)">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 class="text-lg font-bold">{{ bean.name }}</h2>
+                        <p class="text-sm text-gray-500">{{ bean.origin }} · {{ bean.roastLevel }}</p>
+                        <p class="text-xs text-gray-400 mt-1">{{ bean.process }}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-2xl font-bold coffee-brown">{{ bean.stock }}</span>
+                        <span class="text-xs text-gray-400 ml-1">g</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Tasting Records -->
+        <main v-else class="p-4">
+            <div v-if="tastingRecords.length === 0" class="text-center mt-20 text-gray-400">
+                暂无品饮记录
+            </div>
+            <div v-for="record in sortedRecords" :key="record.id" class="bg-white rounded-lg p-4 mb-4 shadow-sm border-l-4 border-yellow-500">
+                <div class="flex justify-between mb-2">
+                    <span class="text-sm font-bold">{{ getBeanName(record.beanId) }}</span>
+                    <span class="text-xs text-gray-400">{{ formatDate(record.date) }}</span>
+                </div>
+                <div class="flex items-center mb-2">
+                    <span v-for="i in 5" :key="i" :class="i <= record.rating ? 'text-yellow-400' : 'text-gray-200'">★</span>
+                    <span class="text-xs text-gray-500 ml-2">{{ record.brewMethod }} · {{ record.waterTemp }}℃</span>
+                </div>
+                <p class="text-sm text-gray-600 italic">"{{ record.notes }}"</p>
+            </div>
+        </main>
+
+        <!-- Tab Bar -->
+        <nav class="fixed bottom-0 left-0 right-0 bg-white border-t flex max-w-md mx-auto">
+            <button @click="currentTab = 'inventory'" :class="currentTab === 'inventory' ? 'coffee-brown font-bold' : 'text-gray-400'" class="flex-1 py-3 text-sm">库存</button>
+            <button @click="currentTab = 'tasting'" :class="currentTab === 'tasting' ? 'coffee-brown font-bold' : 'text-gray-400'" class="flex-1 py-3 text-sm">品饮</button>
+        </nav>
+
+        <!-- Add Bean Modal -->
+        <div v-if="showAddBean" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-20">
+            <div class="bg-white rounded-xl w-full p-6 max-h-[80vh] overflow-y-auto">
+                <h3 class="text-lg font-bold mb-4">新增咖啡豆</h3>
+                <div class="space-y-4">
+                    <input v-model="newBean.name" placeholder="咖啡豆名称" class="w-full border p-2 rounded">
+                    <input v-model="newBean.origin" placeholder="产地" class="w-full border p-2 rounded">
+                    <select v-model="newBean.roastLevel" class="w-full border p-2 rounded">
+                        <option>Light</option>
+                        <option>Medium</option>
+                        <option>Dark</option>
+                    </select>
+                    <input v-model="newBean.process" placeholder="处理方法" class="w-full border p-2 rounded">
+                    <input v-model.number="newBean.stock" type="number" placeholder="初始库存(g)" class="w-full border p-2 rounded">
+                </div>
+                <div class="flex gap-2 mt-6">
+                    <button @click="showAddBean = false" class="flex-1 border py-2 rounded">取消</button>
+                    <button @click="saveBean" class="flex-1 bg-coffee-brown text-white py-2 rounded">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Sheet Mock -->
+        <div v-if="activeBean" class="fixed inset-0 bg-black/50 flex items-end z-20" @click="activeBean = null">
+            <div class="bg-white w-full rounded-t-2xl p-4 space-y-2" @click.stop>
+                <div class="text-center pb-2 border-b text-gray-500 text-sm">{{ activeBean.name }}</div>
+                <button @click="promptStock('IN')" class="w-full py-3 text-center">入库</button>
+                <button @click="promptStock('OUT')" class="w-full py-3 text-center">出库</button>
+                <button @click="showAddTasting = true; activeBean = activeBean" class="w-full py-3 text-center">记录品饮</button>
+                <button @click="deleteBean(activeBean.id)" class="w-full py-3 text-center text-red-500">删除</button>
+                <button @click="activeBean = null" class="w-full py-3 text-center font-bold border-t mt-2">取消</button>
+            </div>
+        </div>
+
+        <!-- Add Tasting Modal -->
+        <div v-if="showAddTasting" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-30">
+            <div class="bg-white rounded-xl w-full p-6">
+                <h3 class="text-lg font-bold mb-4">记录品饮: {{ activeBean?.name }}</h3>
+                <div class="space-y-4">
+                    <input v-model="newTasting.brewMethod" placeholder="冲煮方式 (V60, etc.)" class="w-full border p-2 rounded">
+                    <div class="flex gap-2">
+                        <input v-model="newTasting.waterTemp" type="number" placeholder="水温" class="w-1/2 border p-2 rounded">
+                        <input v-model="newTasting.ratio" placeholder="粉水比" class="w-1/2 border p-2 rounded">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm">评分:</span>
+                        <input type="range" min="1" max="5" v-model.number="newTasting.rating" class="flex-1">
+                        <span>{{ newTasting.rating }}</span>
+                    </div>
+                    <textarea v-model="newTasting.notes" placeholder="风味心得..." class="w-full border p-2 rounded h-20"></textarea>
+                </div>
+                <div class="flex gap-2 mt-6">
+                    <button @click="showAddTasting = false" class="flex-1 border py-2 rounded">取消</button>
+                    <button @click="saveTasting" class="flex-1 bg-coffee-brown text-white py-2 rounded">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const currentTab = ref('inventory');
+                const beans = ref([]);
+                const tastingRecords = ref([]);
+                const showAddBean = ref(false);
+                const activeBean = ref(null);
+                const showAddTasting = ref(false);
+
+                const newBean = ref({ name: '', origin: '', roastLevel: 'Medium', process: '', stock: 0 });
+                const newTasting = ref({ brewMethod: 'V60', waterTemp: 92, ratio: '1:15', rating: 5, notes: '' });
+
+                onMounted(() => {
+                    beans.value = JSON.parse(localStorage.getItem('COFFEE_BEANS') || '[]');
+                    tastingRecords.value = JSON.parse(localStorage.getItem('TASTING_RECORDS') || '[]');
+                });
+
+                const saveBean = () => {
+                    if (!newBean.value.name) return;
+                    const bean = { ...newBean.value, id: Date.now().toString() };
+                    beans.value.push(bean);
+                    localStorage.setItem('COFFEE_BEANS', JSON.stringify(beans.value));
+                    showAddBean.value = false;
+                    newBean.value = { name: '', origin: '', roastLevel: 'Medium', process: '', stock: 0 };
+                };
+
+                const openActionSheet = (bean) => { activeBean.value = bean; };
+
+                const promptStock = (type) => {
+                    const amount = prompt(type === 'IN' ? '请输入入库重量(g)' : '请输入出库重量(g)');
+                    if (amount && !isNaN(amount)) {
+                        const val = parseFloat(amount);
+                        const bean = beans.value.find(b => b.id === activeBean.value.id);
+                        if (bean) {
+                            bean.stock = type === 'IN' ? bean.stock + val : Math.max(0, bean.stock - val);
+                            localStorage.setItem('COFFEE_BEANS', JSON.stringify(beans.value));
+                        }
+                    }
+                    activeBean.value = null;
+                };
+
+                const deleteBean = (id) => {
+                    if (confirm('确认删除？')) {
+                        beans.value = beans.value.filter(b => b.id !== id);
+                        localStorage.setItem('COFFEE_BEANS', JSON.stringify(beans.value));
+                        activeBean.value = null;
+                    }
+                };
+
+                const saveTasting = () => {
+                    const record = { 
+                        ...newTasting.value, 
+                        id: Date.now().toString(), 
+                        beanId: activeBean.value.id,
+                        date: new Date().toISOString()
+                    };
+                    tastingRecords.value.push(record);
+                    localStorage.setItem('TASTING_RECORDS', JSON.stringify(tastingRecords.value));
+                    showAddTasting.value = false;
+                    activeBean.value = null;
+                    currentTab.value = 'tasting';
+                };
+
+                const getBeanName = (id) => beans.value.find(b => b.id === id)?.name || '未知';
+                const formatDate = (ds) => new Date(ds).toLocaleDateString();
+                const sortedRecords = computed(() => [...tastingRecords.value].sort((a,b) => new Date(b.date) - new Date(a.date)));
+
+                return {
+                    currentTab, beans, tastingRecords, showAddBean, activeBean, showAddTasting,
+                    newBean, newTasting, saveBean, openActionSheet, promptStock, deleteBean,
+                    saveTasting, getBeanName, formatDate, sortedRecords
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

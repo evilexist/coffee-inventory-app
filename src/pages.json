@@ -1,0 +1,56 @@
+{
+  "pages": [
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/beans/add",
+      "style": {
+        "navigationBarTitleText": "添加咖啡豆"
+      }
+    },
+    {
+      "path": "pages/inventory/log",
+      "style": {
+        "navigationBarTitleText": "出入库记录"
+      }
+    },
+    {
+      "path": "pages/tasting/record",
+      "style": {
+        "navigationBarTitleText": "品饮记录"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "Coffee Manager",
+    "navigationBarBackgroundColor": "#FAF8F5",
+    "backgroundColor": "#FAF8F5"
+  },
+  "tabBar": {
+    "color": "#9C8B7E",
+    "selectedColor": "#8B5A2B",
+    "borderStyle": "white",
+    "backgroundColor": "#FFFFFF",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "库存"
+      },
+      {
+        "pagePath": "pages/tasting/record",
+        "text": "品饮"
+      }
+    ]
+  }
+}

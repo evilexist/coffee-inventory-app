@@ -1,0 +1,61 @@
+# 依赖
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 构建输出
+dist/
+build/
+.h5/
+.mp-weixin/
+
+# 环境变量（包含敏感信息）
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+
+# 临时文件
+tmp/
+temp/
+
+# 数据库相关
+*.sqlite
+*.db
+
+# 类型检查
+*.tsbuildinfo
+
+# 其他
+coverage/
+.nyc_output/
+
+# Vercel
+.vercel/output
+
+# 地图文件
+*.map
+
+# 源映射
+.sourcemaps/
+
+# 测试相关
+test-results/
+playwright-report/
+playwright/.cache/
