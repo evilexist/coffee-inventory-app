@@ -69,6 +69,11 @@ onHide(() => {
   --transition-slow: 0.35s ease;
 }
 
+/* 全局 box-sizing 设置 - 行业最佳实践 */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 body {
   font-family: var(--font-family);
   background-color: var(--bg);
@@ -250,5 +255,9 @@ input, textarea, select {
 input::placeholder, textarea::placeholder {
   color: var(--text-subtle);
   font-weight: 400;
+}
+
+.uni-tabbar {
+  border-top: 1px solid #f7f7f7;
 }
 </style>

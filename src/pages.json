@@ -45,11 +45,15 @@
     "list": [
       {
         "pagePath": "pages/index/index",
-        "text": "库存"
+        "text": "库存",
+        "iconPath": "static/tab/inventory.png",
+        "selectedIconPath": "static/tab/inventory-active.png"
       },
       {
         "pagePath": "pages/tasting/record",
-        "text": "品饮"
+        "text": "品饮",
+        "iconPath": "static/tab/tasting.png",
+        "selectedIconPath": "static/tab/tasting-active.png"
       }
     ]
   }

@@ -1,6 +1,6 @@
 {
   "name": "coffee-inventory-app",
-  "version": "1.0.38",
+  "version": "1.0.39",
   "scripts": {
     "dev": "npm run dev:h5",
     "dev:h5": "uni",

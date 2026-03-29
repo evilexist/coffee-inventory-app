@@ -1,6 +1,33 @@
-# 咖啡 Bean 库存管理应用
+# 咖啡豆库存管理应用
 
 一个基于 Uni-app 开发的咖啡豆库存管理应用，支持 H5 和小程序平台。
+
+> Riku:
+> 项目中的文档、代码全部由AI Model生成，仅有少量手动修改。
+> 目前仅对PC端、手机端H5进行过功能测试，未涉及小程序。
+> Special thanks for Google Gemini解决了vercel.json配置问题。
+
+## Vercel部署记录 by Riku
+- 3月16日 部署2次
+> TRAE Pro 14天体验开始，Auto Mode，Doller Usage达到$9/10
+- 3月18日 部署11次
+> 开始使用openrouter/hunter-alpha, healer-alpha
+- 3月19日
+> Xiaomi正式发布Mimo-V2, 转而使用openrouter/stepfun/step-3.5-flash:free
+- 3月21日 部署14次
+- 3月23日 部署4次
+- 3月24日 部署1次
+- 3月25日 部署1次
+- 3月26日 部署2次
+> v1.0.35达到Release级别，功能测试通过
+- 3月28日 部署3次
+> v1.0.36:由Prompt“CTO”对项目进行代码审查，并修复了P0级别缺陷
+> v1.0.37:修复了添加品饮记录时前后端同时修改库存导致出库记录2次、库存扣减3次的错误
+> v1.0.38:增加了咖啡豆的Agtron字段和品饮记录的水质字段，开始推送至github仓库
+- 3月29日 部署1次
+> TRAE Pro模式到期
+> v1.0.39:进行前端UI样式的少许优化，并为tabBar增加了icons
+
 
 ## 功能特性
 

@@ -3,7 +3,7 @@
     <view class="page-inner">
       <view class="header">
         <view class="header-left">
-          <text class="h1">☕ 咖啡盒</text>
+          <text class="h1"><image class="logo" src="/static/logo_coffee_box.png" mode="aspectFit" style="display: inline-block; width:36px; height:36px; vertical-align: middle;"></image> 咖啡盒</text>
         </view>
         <view class="header-actions">
           <button class="btn btn-ghost" @click="openExport" aria-label="导出数据">导出</button>

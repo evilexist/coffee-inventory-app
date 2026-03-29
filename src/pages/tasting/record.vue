@@ -25,7 +25,10 @@
         </view>
         <view v-for="record in filteredRecords" :key="record.id" class="record-card card" :aria-label="`品饮记录 ${formatDate(record.date)}`">
           <view class="record-header">
-            <text class="record-date caption">{{ formatDate(record.date) }}</text>
+            <text class="record-date caption">
+              {{ formatDate(record.date) }}
+              <text v-if="!targetBeanId && getBeanName(record.beanId)" class="bean-name"> · {{ getBeanName(record.beanId) }}</text>
+            </text>
             <text class="record-rating" aria-label="评分">{{ '⭐'.repeat(record.rating) }}</text>
           </view>
           <view class="record-details">
@@ -247,6 +250,11 @@ const formatDate = (dateStr: string) => {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 };
 
+const getBeanName = (beanId: string) => {
+  const bean = beans.value.find(b => b.id === beanId);
+  return bean ? bean.name : '';
+};
+
 const saveRecord = async () => {
   // 防止重复提交
   if (isSubmitting.value) {
@@ -441,6 +449,17 @@ const formatExtras = (record: TastingRecord) => {
   display: flex;
   justify-content: space-between;
   margin-bottom: var(--space-sm);
+}
+
+.record-date {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.bean-name {
+  color: var(--primary);
+  font-weight: 500;
 }
 
 .record-details {

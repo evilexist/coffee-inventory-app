@@ -186,10 +186,12 @@ export default {
 }
 
 .error-message {
+  /*
   background: #fef2f2;
   border: 1px solid #fecaca;
   border-radius: 8px;
   padding: 12px;
+  */
   color: #dc2626;
   font-size: 14px;
   font-weight: 500;
@@ -206,12 +208,13 @@ export default {
   cursor: pointer;
   transition: all 0.2s;
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-  color: white;
+  color: white !important;
   box-shadow: 0 4px 12px rgba(139, 90, 43, 0.25);
   margin-top: 32px;
 }
 
 .login-btn:disabled {
+  color: white !important;
   opacity: 0.6;
   cursor: not-allowed;
 }
