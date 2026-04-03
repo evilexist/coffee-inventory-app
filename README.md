@@ -27,6 +27,8 @@
 - 3月29日 部署1次
 > TRAE Pro模式到期
 > v1.0.39:进行前端UI样式的少许优化，并为tabBar增加了icons
+- 4月3日 部署1次
+> v1.0.40:为养豆期做了更直观的图标，为HTML增加了favicon；优化了后端代码[依据CodeReview by qwen3.6-plus:free on Mar.31]
 
 
 ## 功能特性

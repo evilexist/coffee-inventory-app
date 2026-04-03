@@ -1,8 +1,14 @@
 <template>
   <view class="page">
     <view class="page-inner">
-      <scroll-view scroll-y class="log-list" aria-label="出入库记录列表">
-        <view v-if="logs.length === 0" class="empty-state">
+      <scroll-view 
+        scroll-y 
+        class="log-list" 
+        aria-label="出入库记录列表"
+        @scrolltolower="loadMoreLogs"
+        :lower-threshold="100"
+      >
+        <view v-if="logs.length === 0 && !loading" class="empty-state">
           <text class="body">暂无出入库记录</text>
           <view style="margin-top: 16px">
             <button class="btn btn-primary" @click="goHome" aria-label="返回库存页">返回库存</button>
@@ -17,6 +23,14 @@
           <view class="log-amount" :class="log.type" aria-label="出入库数量">
             <text>{{ log.type === 'IN' ? '+' : '-' }}{{ log.amount }}g</text>
           </view>
+        </view>
+        
+        <view v-if="loading" class="loading-indicator">
+          <text class="caption">加载中...</text>
+        </view>
+        
+        <view v-if="!hasMore && logs.length > 0" class="no-more-indicator">
+          <text class="caption">已加载全部</text>
         </view>
       </scroll-view>
     </view>
@@ -33,6 +47,12 @@ const logs = ref<InventoryLog[]>([]);
 const beans = ref<CoffeeBean[]>([]);
 const targetBeanId = ref<string | null>(null);
 
+// 分页相关状态
+const loading = ref(false);
+const hasMore = ref(true);
+const currentPage = ref(1);
+const PAGE_LIMIT = 20;
+
 onLoad((options) => {
   if (options?.beanId) {
     targetBeanId.value = options.beanId as string;
@@ -46,31 +66,66 @@ onLoad((options) => {
 });
 
 const loadData = async () => {
+  loading.value = true;
   try {
-    const beansPromise = targetBeanId.value
-      ? storage.getBeanById(targetBeanId.value)
-      : storage.getBeans();
-    const logsPromise = targetBeanId.value
-      ? storage.getLogs(targetBeanId.value)
-      : storage.getLogs();
+    currentPage.value = 1;
+    
+    let beansResult: CoffeeBean | CoffeeBean[] | null;
+    if (targetBeanId.value) {
+      const bean = await storage.getBeanById(targetBeanId.value);
+      beansResult = bean ? [bean] : [];
+    } else {
+      const result = await storage.getBeans(1, 1000);
+      beansResult = result.data;
+    }
+    
+    const logsResult = targetBeanId.value
+      ? await storage.getLogs(targetBeanId.value, 1, PAGE_LIMIT)
+      : await storage.getLogs(undefined, 1, PAGE_LIMIT);
 
-    const [beansResult, logsResult] = await Promise.all([
-      beansPromise,
-      logsPromise
-    ]);
-
-    beans.value = Array.isArray(beansResult) ? beansResult : (beansResult ? [beansResult] : []);
-    logs.value = logsResult;
+    beans.value = Array.isArray(beansResult) ? beansResult : [];
+    logs.value = logsResult.data;
+    hasMore.value = logsResult.pagination.hasMore;
   } catch (error) {
     console.error('Failed to load data:', error);
-    const beansResult = targetBeanId.value
+    const cachedBeans = targetBeanId.value
       ? localCache.getBeans().filter(b => b.id === targetBeanId.value)
       : localCache.getBeans();
-    const logsResult = targetBeanId.value
+    const cachedLogs = targetBeanId.value
       ? localCache.getLogs().filter(log => log.beanId === targetBeanId.value)
       : localCache.getLogs();
-    beans.value = beansResult;
-    logs.value = logsResult;
+    beans.value = cachedBeans;
+    logs.value = cachedLogs.slice(0, PAGE_LIMIT);
+    hasMore.value = cachedLogs.length > PAGE_LIMIT;
+  } finally {
+    loading.value = false;
+  }
+};
+
+const loadMoreLogs = async () => {
+  if (loading.value || !hasMore.value) return;
+  
+  loading.value = true;
+  try {
+    const nextPage = currentPage.value + 1;
+    const logsPromise = targetBeanId.value
+      ? storage.getLogs(targetBeanId.value, nextPage, PAGE_LIMIT)
+      : storage.getLogs(undefined, nextPage, PAGE_LIMIT);
+    
+    const logsResult = await logsPromise;
+    
+    if (logsResult.data.length > 0) {
+      logs.value = [...logs.value, ...logsResult.data];
+      currentPage.value = nextPage;
+      hasMore.value = logsResult.pagination.hasMore;
+    } else {
+      hasMore.value = false;
+    }
+  } catch (error) {
+    console.error('Failed to load more logs:', error);
+    hasMore.value = false;
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -147,5 +202,21 @@ const goHome = () => {
 
 .log-amount.OUT {
   color: var(--danger);
+}
+
+.loading-indicator,
+.no-more-indicator {
+  padding: var(--space-lg);
+  text-align: center;
+  color: var(--text-subtle);
+}
+
+.loading-indicator {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 </style>

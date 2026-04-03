@@ -1,3 +1,10 @@
+export interface SyncResult<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  synced: boolean;  // 是否成功同步到云端
+}
+
 export interface CoffeeBean {
   id: string;
   name: string;

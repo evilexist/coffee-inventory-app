@@ -72,26 +72,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 async function getRecords(req: VercelRequest, res: VercelResponse, userId: string) {
   const { beanId } = req.query;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 20;
+  const offset = (page - 1) * limit;
 
   let records;
+  let countResult;
+  
   if (beanId) {
+    countResult = await sql`
+      SELECT COUNT(*) as total FROM tasting_records tr
+      WHERE tr.user_id = ${userId} AND tr.bean_id = ${beanId}
+    `;
+    
     records = await sql`
       SELECT tr.*, cb.name as bean_name
       FROM tasting_records tr
       JOIN coffee_beans cb ON tr.bean_id = cb.id
       WHERE tr.user_id = ${userId} AND tr.bean_id = ${beanId}
       ORDER BY tr.date DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   } else {
+    countResult = await sql`
+      SELECT COUNT(*) as total FROM tasting_records tr
+      WHERE tr.user_id = ${userId}
+    `;
+    
     records = await sql`
       SELECT tr.*, cb.name as bean_name
       FROM tasting_records tr
       JOIN coffee_beans cb ON tr.bean_id = cb.id
       WHERE tr.user_id = ${userId}
       ORDER BY tr.date DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   }
-  return res.status(200).json(records);
+  
+  const total = parseInt(countResult[0].total);
+  const totalPages = Math.ceil(total / limit);
+  
+  return res.status(200).json({
+    data: records,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasMore: page < totalPages
+    }
+  });
 }
 
 async function createRecord(req: VercelRequest, res: VercelResponse, userId: string) {

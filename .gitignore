@@ -42,6 +42,10 @@ temp/
 # 类型检查
 *.tsbuildinfo
 
+# TypeScript 编译产物（api 目录）
+api/**/*.js
+api/**/*.js.map
+
 # 其他
 coverage/
 .nyc_output/

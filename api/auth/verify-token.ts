@@ -4,10 +4,10 @@ import sql from '../db';
 
 // JWT密钥
 const JWT_SECRET = process.env.JWT_SECRET;
+
 if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required');
+  console.error('❌ JWT_SECRET 环境变量未设置，请在 Vercel 控制台中配置');
 }
-const JWT_SECRET_SAFE = JWT_SECRET; // 类型收缩：确保非空
 
 // 验证token
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -23,8 +23,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const token = authHeader.substring(7);
 
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET_SAFE) as { userId: string; username: string };
+  if (!JWT_SECRET) {
+    return res.status(500).json({ error: '服务器配置错误：JWT密钥未设置' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; username: string };
 
       // 检查用户是否存在
       const user = await sql`

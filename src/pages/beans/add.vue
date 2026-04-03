@@ -374,19 +374,18 @@ const save = async () => {
 
     // 如果初始库存大于0，自动创建入库记录
     if (stockNum > 0) {
-      try {
-        await storage.createLog({
-          id: generateId('log'),
-          beanId: savedBean.id,  // 使用服务器返回的真实ID
-          type: 'IN',
-          amount: stockNum,
-          date: new Date().toISOString(),
-          roastDate: roastDate || undefined,
-          note: '由系统初始化入库'
-        });
-      } catch (logError) {
-        console.warn('创建入库记录失败:', logError);
-        // 不阻断流程，只是警告用户
+      const logResult = await storage.createLog({
+        id: generateId('log'),
+        beanId: savedBean.id,  // 使用服务器返回的真实ID
+        type: 'IN',
+        amount: stockNum,
+        date: new Date().toISOString(),
+        roastDate: roastDate || undefined,
+        note: '由系统初始化入库'
+      });
+      
+      if (!logResult.success) {
+        console.error('创建入库记录失败:', logResult.error);
         uni.showToast({
           title: '咖啡豆已保存，但入库记录创建失败',
           icon: 'none'

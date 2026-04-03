@@ -59,11 +59,11 @@ export const api = {
   },
 
   // 咖啡豆相关
-  async getBeans(): Promise<CoffeeBean[]> {
-    const res = await fetch(`${API_BASE}/beans`, {
+  async getBeans(page = 1, limit = 20): Promise<{ data: CoffeeBean[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasMore: boolean } }> {
+    const res = await fetch(`${API_BASE}/beans?page=${page}&limit=${limit}`, {
       headers: getAuthHeaders(),
     });
-    return handleApiResponse<CoffeeBean[]>(res);
+    return handleApiResponse(res);
   },
 
   async getBeanById(id: string): Promise<CoffeeBean> {
@@ -117,14 +117,14 @@ export const api = {
   },
 
   // 出入库记录相关
-  async getLogs(beanId?: string): Promise<InventoryLog[]> {
+  async getLogs(beanId?: string, page = 1, limit = 20): Promise<{ data: InventoryLog[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasMore: boolean } }> {
     const url = beanId
-      ? `${API_BASE}/inventory?beanId=${beanId}`
-      : `${API_BASE}/inventory`;
+      ? `${API_BASE}/inventory?beanId=${beanId}&page=${page}&limit=${limit}`
+      : `${API_BASE}/inventory?page=${page}&limit=${limit}`;
     const res = await fetch(url, {
       headers: getAuthHeaders(),
     });
-    return handleApiResponse<InventoryLog[]>(res);
+    return handleApiResponse(res);
   },
 
   async createLog(log: InventoryLog): Promise<InventoryLog> {
@@ -145,14 +145,14 @@ export const api = {
   },
 
   // 品饮记录相关
-  async getTastingRecords(beanId?: string): Promise<TastingRecord[]> {
+  async getTastingRecords(beanId?: string, page = 1, limit = 20): Promise<{ data: TastingRecord[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasMore: boolean } }> {
     const url = beanId
-      ? `${API_BASE}/tasting?beanId=${beanId}`
-      : `${API_BASE}/tasting`;
+      ? `${API_BASE}/tasting?beanId=${beanId}&page=${page}&limit=${limit}`
+      : `${API_BASE}/tasting?page=${page}&limit=${limit}`;
     const res = await fetch(url, {
       headers: getAuthHeaders(),
     });
-    return handleApiResponse<TastingRecord[]>(res);
+    return handleApiResponse(res);
   },
 
   async createTastingRecord(record: TastingRecord): Promise<{ success: boolean; record?: TastingRecord; error?: string; stock?: number }> {

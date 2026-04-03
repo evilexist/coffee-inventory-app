@@ -79,12 +79,34 @@ async function getBeanById(req: VercelRequest, res: VercelResponse, userId: stri
 }
 
 async function getBeans(req: VercelRequest, res: VercelResponse, userId: string) {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 20;
+  const offset = (page - 1) * limit;
+
+  const countResult = await sql`
+    SELECT COUNT(*) as total FROM coffee_beans 
+    WHERE user_id = ${userId}
+  `;
+  const total = parseInt(countResult[0].total);
+  const totalPages = Math.ceil(total / limit);
+
   const beans = await sql`
     SELECT * FROM coffee_beans 
     WHERE user_id = ${userId}
     ORDER BY created_at DESC
+    LIMIT ${limit} OFFSET ${offset}
   `;
-  return res.status(200).json(beans);
+  
+  return res.status(200).json({
+    data: beans,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasMore: page < totalPages
+    }
+  });
 }
 
 async function createBean(req: VercelRequest, res: VercelResponse, userId: string) {

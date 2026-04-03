@@ -62,22 +62,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 async function getLogs(req: VercelRequest, res: VercelResponse, userId: string) {
   const { beanId } = req.query;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 20;
+  const offset = (page - 1) * limit;
 
   let logs;
+  let countResult;
+  
   if (beanId) {
+    countResult = await sql`
+      SELECT COUNT(*) as total FROM inventory_logs
+      WHERE user_id = ${userId} AND bean_id = ${beanId}
+    `;
+    
     logs = await sql`
       SELECT * FROM inventory_logs
       WHERE user_id = ${userId} AND bean_id = ${beanId}
       ORDER BY date DESC, created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   } else {
+    countResult = await sql`
+      SELECT COUNT(*) as total FROM inventory_logs
+      WHERE user_id = ${userId}
+    `;
+    
     logs = await sql`
       SELECT * FROM inventory_logs
       WHERE user_id = ${userId}
       ORDER BY date DESC, created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   }
-  return res.status(200).json(logs);
+  
+  const total = parseInt(countResult[0].total);
+  const totalPages = Math.ceil(total / limit);
+  
+  return res.status(200).json({
+    data: logs,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasMore: page < totalPages
+    }
+  });
 }
 
 async function createLog(req: VercelRequest, res: VercelResponse, userId: string) {

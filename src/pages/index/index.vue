@@ -27,8 +27,14 @@
         </view>
       </view>
 
-      <scroll-view scroll-y class="bean-list" aria-label="咖啡豆列表">
-        <view v-if="beans.length === 0" class="empty-state">
+      <scroll-view 
+        scroll-y 
+        class="bean-list" 
+        aria-label="咖啡豆列表"
+        @scrolltolower="loadMoreBeans"
+        :lower-threshold="100"
+      >
+        <view v-if="beans.length === 0 && !loading" class="empty-state">
           <text class="body">暂无咖啡豆</text>
           <view style="margin-top: 16px">
             <button class="btn btn-primary" @click="goToAdd" aria-label="去添加咖啡豆">去添加</button>
@@ -51,6 +57,14 @@
             <text class="stock-num">{{ bean.stock }}</text>
             <text class="unit">g</text>
           </view>
+        </view>
+        
+        <view v-if="loading" class="loading-indicator">
+          <text class="caption">加载中...</text>
+        </view>
+        
+        <view v-if="!hasMore && beans.length > 0" class="no-more-indicator">
+          <text class="caption">已加载全部</text>
         </view>
       </scroll-view>
     </view>
@@ -164,18 +178,53 @@ const inBean = ref<CoffeeBean | null>(null);
 const inRoastDate = ref('');
 const inAmount = ref('');
 
+// 分页相关状态
+const loading = ref(false);
+const hasMore = ref(true);
+const currentPage = ref(1);
+const PAGE_LIMIT = 20;
+
 const totalStock = computed(() => {
   const total = beans.value.reduce((sum, b) => sum + (Number.isFinite(b.stock) ? b.stock : 0), 0);
   return Math.max(0, Math.round(total));
 });
 
 const loadData = async () => {
+  loading.value = true;
   try {
-    beans.value = await storage.getBeans();
+    currentPage.value = 1;
+    const result = await storage.getBeans(1, PAGE_LIMIT);
+    beans.value = result.data;
+    hasMore.value = result.pagination.hasMore;
   } catch (error) {
     console.error('Failed to load beans:', error);
-    // 回退到本地缓存（已标准化）
-    beans.value = localCache.getBeans();
+    beans.value = localCache.getBeans().slice(0, PAGE_LIMIT);
+    hasMore.value = localCache.getBeans().length > PAGE_LIMIT;
+  } finally {
+    loading.value = false;
+  }
+};
+
+const loadMoreBeans = async () => {
+  if (loading.value || !hasMore.value) return;
+  
+  loading.value = true;
+  try {
+    const nextPage = currentPage.value + 1;
+    const result = await storage.getBeans(nextPage, PAGE_LIMIT);
+    
+    if (result.data.length > 0) {
+      beans.value = [...beans.value, ...result.data];
+      currentPage.value = nextPage;
+      hasMore.value = result.pagination.hasMore;
+    } else {
+      hasMore.value = false;
+    }
+  } catch (error) {
+    console.error('Failed to load more beans:', error);
+    hasMore.value = false;
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -291,17 +340,40 @@ const getBeanMeta = (bean: CoffeeBean) => {
 };
 
 
+const getRoastingDays = (roastDate: string): number | null => {
+  if (!roastDate) return null;
+  const roast = new Date(roastDate);
+  const today = new Date();
+  roast.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.floor((today.getTime() - roast.getTime()) / (1000 * 60 * 60 * 24));
+  return diff >= 0 ? diff : null;
+};
+
+const getRoastingStageIcon = (roastDate: string): string => {
+  const days = getRoastingDays(roastDate);
+  if (days === null) return '';
+  if (days < 7) return '🟡';
+  if (days <= 30) return '🟢';
+  if (days <= 60) return '🟠';
+  return '🔴';
+};
+
 const getBeanBatchMeta = (bean: CoffeeBean) => {
   const parts: string[] = [];
   const roastLevel = (bean.roastLevel || '').trim();
   const roastDate = (bean.roastDate || '').trim();
   const price = typeof bean.referencePrice === 'number' ? bean.referencePrice : undefined;
 
+  if (roastDate) {
+    const stageIcon = getRoastingStageIcon(roastDate);
+    const roastDateText = stageIcon ? `${stageIcon} ${roastDate}烘焙` : `${roastDate}烘焙`;
+    parts.push(roastDateText);
+  }
   if (roastLevel) {
     const agtronDisplay = bean.agtron !== undefined && bean.agtron !== null ? `#${bean.agtron}` : '';
     parts.push(agtronDisplay ? `${roastLevel}${agtronDisplay}` : roastLevel);
   }
-  if (roastDate) parts.push(`${roastDate}烘焙`);
   if (price !== undefined) parts.push(`参考价 ${price}元`);
   return parts.join(' · ');
 };
@@ -413,7 +485,8 @@ const confirmIn = async () => {
   }
 
   try {
-    const allBeans = await storage.getBeans();
+    const allBeansResult = await storage.getBeans(1, 1000);
+    const allBeans = allBeansResult.data;
     const target = allBeans.find(b => b.id === inBean.value!.id);
     if (!target) {
       uni.showToast({ title: '未找到咖啡豆', icon: 'none' });
@@ -423,9 +496,13 @@ const confirmIn = async () => {
 
     target.stock = Math.max(0, Math.round(target.stock + amount));
     target.roastDate = roastDate;
-    await storage.updateBean(target);
+    const updateResult = await storage.updateBean(target);
 
-    await storage.createLog({
+    if (!updateResult.success) {
+      uni.showToast({ title: `入库成功，但云端同步失败：${updateResult.error}`, icon: 'none' });
+    }
+
+    const logResult = await storage.createLog({
       id: generateId('log'),
       beanId: target.id,
       type: 'IN',
@@ -433,6 +510,10 @@ const confirmIn = async () => {
       date: new Date().toISOString(),
       roastDate
     });
+
+    if (!logResult.success) {
+      uni.showToast({ title: `入库成功，但入库记录创建失败：${logResult.error}`, icon: 'none' });
+    }
 
     uni.showToast({ title: '入库成功' });
     closeInModal();
@@ -450,12 +531,13 @@ const deleteBean = (id: string) => {
     content: '确定要删除这款咖啡豆吗？相关记录将保留。',
     success: async (res) => {
       if (res.confirm) {
-        try {
-          await storage.deleteBean(id);
+        const result = await storage.deleteBean(id);
+        if (result.success) {
+          uni.showToast({ title: '删除成功', icon: 'success' });
           loadData();
-        } catch (error) {
-          console.error('删除失败:', error);
-          uni.showToast({ title: '删除失败', icon: 'none' });
+        } else {
+          uni.showToast({ title: `删除成功，但云端同步失败：${result.error}`, icon: 'none' });
+          loadData();
         }
       }
     }
@@ -508,6 +590,22 @@ const deleteBean = (id: string) => {
 
 .bean-list {
   height: calc(100vh - 220px);
+}
+
+.loading-indicator,
+.no-more-indicator {
+  padding: var(--space-lg);
+  text-align: center;
+  color: var(--text-subtle);
+}
+
+.loading-indicator {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .bean-card {

@@ -1,10 +1,8 @@
 # 咖啡豆库存管理系统 - 深度代码审查报告
 
-**审查模型**: stepfun/step-3.5-flash:free
-
-**审查日期**: 2026-03-28
-
 **项目**: 咖啡豆库存管理系统 (Coffee Inventory App)
+**审查日期**: 2026-03-28
+**审查模型**: stepfun/step-3.5-flash:free
 
 **技术栈**: Vue 3 + uni-app + TypeScript + Vercel Neon + PostgreSQL
 

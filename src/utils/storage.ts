@@ -1,4 +1,4 @@
-import { CoffeeBean, InventoryLog, TastingRecord } from '../types';
+import { CoffeeBean, InventoryLog, TastingRecord, SyncResult } from '../types';
 import { api } from './api';
 
 const BEANS_KEY = 'COFFEE_BEANS';
@@ -43,22 +43,41 @@ export { localCache };
 
 export const storage = {
   // 咖啡豆相关
-  async getBeans(): Promise<CoffeeBean[]> {
+  async getBeans(page = 1, limit = 20): Promise<{ data: CoffeeBean[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasMore: boolean } }> {
     try {
-      const beans = await api.getBeans();
-      const normalized = beans.map(normalizeCoffeeBean).filter(b => b.id);
-      localCache.saveBeans(normalized);
-      return normalized;
+      const result = await api.getBeans(page, limit);
+      const normalized = result.data.map(normalizeCoffeeBean).filter(b => b.id);
+      
+      if (page === 1) {
+        localCache.saveBeans(normalized);
+      } else {
+        const cached = localCache.getBeans();
+        localCache.saveBeans([...cached, ...normalized]);
+      }
+      
+      return { data: normalized, pagination: result.pagination };
     } catch (error) {
       console.warn('Failed to fetch from API, using local cache:', error);
-      return localCache.getBeans();
+      const cached = localCache.getBeans();
+      const start = (page - 1) * limit;
+      const end = start + limit;
+      return {
+        data: cached.slice(start, end),
+        pagination: {
+          page,
+          limit,
+          total: cached.length,
+          totalPages: Math.ceil(cached.length / limit),
+          hasMore: end < cached.length
+        }
+      };
     }
   },
 
   async getBeanById(id: string): Promise<CoffeeBean | null> {
     try {
-      const beans = await api.getBeans();
-      const normalized = beans.map(normalizeCoffeeBean).filter(b => b.id);
+      const result = await api.getBeans(1, 1000);
+      const normalized = result.data.map(normalizeCoffeeBean).filter(b => b.id);
       localCache.saveBeans(normalized);
       const bean = normalized.find(b => b.id === id);
       return bean || null;
@@ -118,7 +137,7 @@ export const storage = {
     }
   },
 
-  async updateBean(bean: CoffeeBean): Promise<CoffeeBean> {
+  async updateBean(bean: CoffeeBean): Promise<SyncResult<CoffeeBean>> {
     try {
       const result = await api.updateBean(bean);
       const beans = localCache.getBeans();
@@ -127,27 +146,44 @@ export const storage = {
         beans[index] = result;
         localCache.saveBeans(beans);
       }
-      return result;
-    } catch (error) {
-      console.warn('Failed to update bean via API, saving locally:', error);
+      return { success: true, data: result, synced: true };
+    } catch (error: any) {
+      console.error('Failed to update bean via API:', error);
+      
       const beans = localCache.getBeans();
       const index = beans.findIndex(b => b.id === bean.id);
       if (index !== -1) {
-        beans[index] = bean;
+        beans[index] = { ...bean, _synced: false, _syncError: error.message || '同步失败' };
         localCache.saveBeans(beans);
       }
-      return bean;
+      
+      return { 
+        success: false, 
+        data: bean, 
+        error: error.message || '更新失败', 
+        synced: false 
+      };
     }
   },
 
-  async deleteBean(id: string): Promise<void> {
+  async deleteBean(id: string): Promise<SyncResult<void>> {
     try {
       await api.deleteBean(id);
-    } catch (error) {
-      console.warn('Failed to delete bean via API:', error);
+      const beans = localCache.getBeans().filter(b => b.id !== id);
+      localCache.saveBeans(beans);
+      return { success: true, synced: true };
+    } catch (error: any) {
+      console.error('Failed to delete bean via API:', error);
+      
+      const beans = localCache.getBeans().filter(b => b.id !== id);
+      localCache.saveBeans(beans);
+      
+      return { 
+        success: false, 
+        error: error.message || '删除失败', 
+        synced: false 
+      };
     }
-    const beans = localCache.getBeans().filter(b => b.id !== id);
-    localCache.saveBeans(beans);
   },
 
   // 原子更新库存（解决竞态条件）
@@ -175,59 +211,110 @@ export const storage = {
   },
 
   // 出入库记录相关
-  async getLogs(beanId?: string): Promise<InventoryLog[]> {
+  async getLogs(beanId?: string, page = 1, limit = 20): Promise<{ data: InventoryLog[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasMore: boolean } }> {
     try {
-      const logs = await api.getLogs(beanId);
-      const normalized = logs.map(normalizeInventoryLog).filter(l => l.id);
-      localCache.saveLogs(normalized);
-      return normalized;
+      const result = await api.getLogs(beanId, page, limit);
+      const normalized = result.data.map(normalizeInventoryLog).filter(l => l.id);
+      
+      if (page === 1) {
+        localCache.saveLogs(normalized);
+      } else {
+        const cached = localCache.getLogs();
+        localCache.saveLogs([...cached, ...normalized]);
+      }
+      
+      return { data: normalized, pagination: result.pagination };
     } catch (error) {
       console.warn('Failed to fetch logs from API, using local cache:', error);
       const logs = localCache.getLogs();
-      // 如果指定了 beanId，从缓存中过滤出该豆子的日志
-      if (beanId) {
-        return logs.filter(log => log.beanId === beanId);
-      }
-      return logs;
+      const start = (page - 1) * limit;
+      const end = start + limit;
+      const filtered = beanId ? logs.filter(log => log.beanId === beanId) : logs;
+      return {
+        data: filtered.slice(start, end),
+        pagination: {
+          page,
+          limit,
+          total: filtered.length,
+          totalPages: Math.ceil(filtered.length / limit),
+          hasMore: end < filtered.length
+        }
+      };
     }
   },
 
-  async createLog(log: InventoryLog): Promise<InventoryLog> {
+  async createLog(log: InventoryLog): Promise<SyncResult<InventoryLog>> {
     try {
       const result = await api.createLog(log);
       const logs = localCache.getLogs();
       logs.push(result);
       localCache.saveLogs(logs);
-      return result;
-    } catch (error) {
-      console.warn('Failed to create log via API, saving locally:', error);
+      return { success: true, data: result, synced: true };
+    } catch (error: any) {
+      console.error('Failed to create log via API:', error);
+      
       const logs = localCache.getLogs();
       logs.push(log);
       localCache.saveLogs(logs);
-      return log;
+      
+      return { 
+        success: false, 
+        data: log, 
+        error: error.message || '创建入库记录失败', 
+        synced: false 
+      };
     }
   },
 
-  async deleteLog(id: string): Promise<void> {
+  async deleteLog(id: string): Promise<SyncResult<void>> {
     try {
       await api.deleteLog(id);
-    } catch (error) {
-      console.warn('Failed to delete log via API:', error);
+      const logs = localCache.getLogs().filter(l => l.id !== id);
+      localCache.saveLogs(logs);
+      return { success: true, synced: true };
+    } catch (error: any) {
+      console.error('Failed to delete log via API:', error);
+      
+      const logs = localCache.getLogs().filter(l => l.id !== id);
+      localCache.saveLogs(logs);
+      
+      return { 
+        success: false, 
+        error: error.message || '删除失败', 
+        synced: false 
+      };
     }
-    const logs = localCache.getLogs().filter(l => l.id !== id);
-    localCache.saveLogs(logs);
   },
 
   // 品饮记录相关
-  async getTastingRecords(): Promise<TastingRecord[]> {
+  async getTastingRecords(beanId?: string, page = 1, limit = 20): Promise<{ data: TastingRecord[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasMore: boolean } }> {
     try {
-      const records = await api.getTastingRecords();
-      const normalized = records.map(normalizeTastingRecord).filter(r => r.id);
-      localCache.saveTastingRecords(normalized);
-      return normalized;
+      const result = await api.getTastingRecords(beanId, page, limit);
+      const normalized = result.data.map(normalizeTastingRecord).filter(r => r.id);
+      
+      if (page === 1) {
+        localCache.saveTastingRecords(normalized);
+      } else {
+        const cached = localCache.getTastingRecords();
+        localCache.saveTastingRecords([...cached, ...normalized]);
+      }
+      
+      return { data: normalized, pagination: result.pagination };
     } catch (error) {
       console.warn('Failed to fetch tasting records from API, using local cache:', error);
-      return localCache.getTastingRecords();
+      const records = localCache.getTastingRecords();
+      const start = (page - 1) * limit;
+      const end = start + limit;
+      return {
+        data: records.slice(start, end),
+        pagination: {
+          page,
+          limit,
+          total: records.length,
+          totalPages: Math.ceil(records.length / limit),
+          hasMore: end < records.length
+        }
+      };
     }
   },
 
@@ -256,7 +343,7 @@ export const storage = {
     }
   },
 
-  async updateTastingRecord(record: TastingRecord): Promise<TastingRecord> {
+  async updateTastingRecord(record: TastingRecord): Promise<SyncResult<TastingRecord>> {
     try {
       const result = await api.updateTastingRecord(record);
       const records = localCache.getTastingRecords();
@@ -265,27 +352,44 @@ export const storage = {
         records[index] = result;
         localCache.saveTastingRecords(records);
       }
-      return result;
-    } catch (error) {
-      console.warn('Failed to update tasting record via API, saving locally:', error);
+      return { success: true, data: result, synced: true };
+    } catch (error: any) {
+      console.error('Failed to update tasting record via API:', error);
+      
       const records = localCache.getTastingRecords();
       const index = records.findIndex(r => r.id === record.id);
       if (index !== -1) {
         records[index] = record;
         localCache.saveTastingRecords(records);
       }
-      return record;
+      
+      return { 
+        success: false, 
+        data: record, 
+        error: error.message || '更新失败', 
+        synced: false 
+      };
     }
   },
 
-  async deleteTastingRecord(id: string): Promise<void> {
+  async deleteTastingRecord(id: string): Promise<SyncResult<void>> {
     try {
       await api.deleteTastingRecord(id);
-    } catch (error) {
-      console.warn('Failed to delete tasting record via API:', error);
+      const records = localCache.getTastingRecords().filter(r => r.id !== id);
+      localCache.saveTastingRecords(records);
+      return { success: true, synced: true };
+    } catch (error: any) {
+      console.error('Failed to delete tasting record via API:', error);
+      
+      const records = localCache.getTastingRecords().filter(r => r.id !== id);
+      localCache.saveTastingRecords(records);
+      
+      return { 
+        success: false, 
+        error: error.message || '删除失败', 
+        synced: false 
+      };
     }
-    const records = localCache.getTastingRecords().filter(r => r.id !== id);
-    localCache.saveTastingRecords(records);
   },
 
   clearAll() {

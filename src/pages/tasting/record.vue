@@ -16,8 +16,14 @@
         </view>
       </view>
 
-      <scroll-view scroll-y class="record-list" aria-label="品饮记录列表">
-        <view v-if="filteredRecords.length === 0" class="empty-state">
+      <scroll-view 
+        scroll-y 
+        class="record-list" 
+        aria-label="品饮记录列表"
+        @scrolltolower="loadMoreRecords"
+        :lower-threshold="100"
+      >
+        <view v-if="filteredRecords.length === 0 && !loading" class="empty-state">
           <text class="body">暂无品饮记录</text>
           <view v-if="beans.length === 0" style="margin-top: 10px">
             <text class="caption">先去库存页添加咖啡豆</text>
@@ -46,6 +52,14 @@
             <text class="caption">改进意见</text>
             <text class="body text-muted" style="margin-top: 6px; display: block">{{ record.improvement }}</text>
           </view>
+        </view>
+        
+        <view v-if="loading" class="loading-indicator">
+          <text class="caption">加载中...</text>
+        </view>
+        
+        <view v-if="!hasMore && records.length > 0" class="no-more-indicator">
+          <text class="caption">已加载全部</text>
         </view>
       </scroll-view>
     </view>
@@ -156,6 +170,12 @@ const targetBeanId = ref('');
 const showAddModal = ref(false);
 const isSubmitting = ref(false);
 
+// 分页相关状态
+const loading = ref(false);
+const hasMore = ref(true);
+const currentPage = ref(1);
+const PAGE_LIMIT = 20;
+
 const form = reactive({
   dose: '',
   brewMethodChoice: '手冲',
@@ -181,13 +201,44 @@ onLoad((options: any) => {
 });
 
 const loadData = async () => {
+  loading.value = true;
   try {
-    records.value = await storage.getTastingRecords();
-    beans.value = await storage.getBeans();
+    currentPage.value = 1;
+    const recordsResult = await storage.getTastingRecords(undefined, 1, PAGE_LIMIT);
+    const beansResult = await storage.getBeans(1, 1000);
+    records.value = recordsResult.data;
+    beans.value = beansResult.data;
+    hasMore.value = recordsResult.pagination.hasMore;
   } catch (error) {
     console.error('Failed to load data:', error);
-    records.value = localCache.getTastingRecords();
+    records.value = localCache.getTastingRecords().slice(0, PAGE_LIMIT);
     beans.value = localCache.getBeans();
+    hasMore.value = localCache.getTastingRecords().length > PAGE_LIMIT;
+  } finally {
+    loading.value = false;
+  }
+};
+
+const loadMoreRecords = async () => {
+  if (loading.value || !hasMore.value) return;
+  
+  loading.value = true;
+  try {
+    const nextPage = currentPage.value + 1;
+    const recordsResult = await storage.getTastingRecords(undefined, nextPage, PAGE_LIMIT);
+    
+    if (recordsResult.data.length > 0) {
+      records.value = [...records.value, ...recordsResult.data];
+      currentPage.value = nextPage;
+      hasMore.value = recordsResult.pagination.hasMore;
+    } else {
+      hasMore.value = false;
+    }
+  } catch (error) {
+    console.error('Failed to load more records:', error);
+    hasMore.value = false;
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -287,7 +338,8 @@ const saveRecord = async () => {
       return;
     }
 
-    const allBeans = await storage.getBeans();
+    const allBeansResult = await storage.getBeans(1, 1000);
+    const allBeans = allBeansResult.data;
     const targetBean = allBeans.find(b => b.id === targetBeanId.value);
     if (!targetBean) {
       uni.showToast({ title: '未找到咖啡豆', icon: 'none' });
@@ -475,6 +527,22 @@ const formatExtras = (record: TastingRecord) => {
   border-top: 1px solid var(--border-light);
   padding-top: var(--space-sm);
   margin-top: var(--space-sm);
+}
+
+.loading-indicator,
+.no-more-indicator {
+  padding: var(--space-lg);
+  text-align: center;
+  color: var(--text-subtle);
+}
+
+.loading-indicator {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .radio-group {
