@@ -1,6 +1,6 @@
 {
   "name": "coffee-inventory-app",
-  "version": "1.0.40",
+  "version": "1.0.41",
   "scripts": {
     "dev": "npm run dev:h5",
     "dev:h5": "uni",
@@ -8,7 +8,9 @@
     "build": "npm run build:h5",
     "build:h5": "uni build",
     "build:mp-weixin": "uni build -p mp-weixin",
-    "vercel-build": "npm run build:h5"
+    "vercel-build": "npm run build:h5",
+    "test:web": "jest",
+    "test:mp-weixin": "jest"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-alpha-3080220230511001",
@@ -34,6 +36,7 @@
     "@dcloudio/vite-plugin-uni": "3.0.0-alpha-3080220230511001",
     "@types/jsonwebtoken": "^9.0.10",
     "@vercel/node": "^3.0.0",
+    "jest": "^27.0.4",
     "typescript": "^5.0.0",
     "vite": "4.2.1"
   }

@@ -29,6 +29,8 @@
 > v1.0.39:进行前端UI样式的少许优化，并为tabBar增加了icons
 - 4月3日 部署1次
 > v1.0.40:为养豆期做了更直观的图标，为HTML增加了favicon；优化了后端代码[依据CodeReview by qwen3.6-plus:free on Mar.31]
+- 4月5日 部署1次
+> v1.0.41:增加基于测试框架（Jest + uni-automator）的自动化测试内容
 
 
 ## 功能特性
@@ -44,6 +46,7 @@
 - **前端框架**：Vue 3 + Uni-app 3
 - **开发语言**：TypeScript
 - **构建工具**：Vite 4
+- **测试框架**：Jest + @dcloudio/uni-automator
 - **后端**：Node.js + Express
 - **数据库**：PostgreSQL (Neon)
 - **部署平台**：Vercel
@@ -59,10 +62,27 @@ coffee-inventory-app/
 │   └── tasting.js    # 品饮记录
 ├── src/              # 前端源码
 │   ├── pages/        # 页面组件
+│   │   ├── login/    # 登录页面
+│   │   │   ├── index.vue
+│   │   │   └── index.test.js    # 登录页面测试
+│   │   ├── index/    # 库存首页
+│   │   │   ├── index.vue
+│   │   │   └── index.test.js    # 首页测试
+│   │   ├── beans/    # 咖啡豆管理
+│   │   │   ├── add.vue
+│   │   │   └── add.test.js      # 添加咖啡豆测试
+│   │   ├── inventory/ # 出入库记录
+│   │   │   ├── log.vue
+│   │   │   └── log.test.js      # 出入库记录测试
+│   │   └── tasting/  # 品饮记录
+│   │       ├── record.vue
+│   │       └── record.test.js   # 品饮记录测试
 │   ├── utils/        # 工具函数
 │   └── types/        # TypeScript 类型定义
 ├── db/               # 数据库迁移和 schema
 ├── documents/        # 项目文档
+├── jest.config.js    # Jest 测试配置
+├── jest.setup.js     # Jest 环境初始化
 └── dist/             # 构建输出（忽略）
 ```
 
@@ -109,6 +129,27 @@ npm run build
 ```
 
 构建产物将生成在 `dist/build/h5` 目录。
+
+### 运行自动化测试
+
+项目包含完整的自动化测试套件，覆盖 5 个核心页面共 37 个测试用例：
+
+```bash
+# 运行 Web 平台测试
+npm run test:web
+
+# 运行微信小程序平台测试
+npm run test:mp-weixin
+```
+
+**测试覆盖范围**：
+- 登录页面：页面渲染、输入验证、登录成功
+- 库存首页：列表展示、空状态、页面导航
+- 添加咖啡豆：表单验证、提交成功
+- 出入库记录：记录列表、分页、空状态
+- 品饮记录：CRUD 操作、模态框交互
+
+详细测试报告请参考 [documents/Automated_Test_Report_20260405.md](documents/Automated_Test_Report_20260405.md)
 
 ## 部署到 Vercel
 
