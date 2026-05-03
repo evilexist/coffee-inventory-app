@@ -39,15 +39,24 @@ async function updateBeanStock(req: VercelRequest, res: VercelResponse, userId: 
   // 原子更新库存
   // 如果是扣减（amount < 0），需要确保库存充足
   // 如果是增加（amount > 0），直接更新
-  const result = await sql`
-    UPDATE coffee_beans
-    SET stock = stock + ${amount},
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = ${id}
-      AND user_id = ${userId}
-      ${amount < 0 ? `AND stock >= ${-amount}` : ''}
-    RETURNING stock
-  `;
+  const result = amount < 0
+    ? await sql`
+        UPDATE coffee_beans
+        SET stock = stock + ${amount},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${id}
+          AND user_id = ${userId}
+          AND stock >= ${-amount}
+        RETURNING stock
+      `
+    : await sql`
+        UPDATE coffee_beans
+        SET stock = stock + ${amount},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${id}
+          AND user_id = ${userId}
+        RETURNING stock
+      `;
 
   if (result.length === 0) {
     // 检查是否是因为库存不足
