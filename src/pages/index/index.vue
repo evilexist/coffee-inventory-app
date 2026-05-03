@@ -44,6 +44,7 @@
           v-for="bean in beans"
           :key="bean.id"
           class="bean-card card"
+          :class="{ 'bean-card--empty': (bean.stock ?? 0) === 0 }"
           role="button"
           :aria-label="`打开 ${bean.name} 的快捷操作`"
           @click="openActions(bean)"
@@ -613,6 +614,11 @@ const deleteBean = (id: string) => {
   align-items: center;
   cursor: pointer;
   transition: all var(--transition-normal);
+}
+
+.bean-card--empty {
+  opacity: 0.8;
+  border-left: 3px solid #d9d9d9;
 }
 
 .bean-card:hover {
