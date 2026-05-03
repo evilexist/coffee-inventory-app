@@ -165,6 +165,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { CoffeeBean, InventoryLog } from '../../types';
 import { storage, localCache } from '../../utils/storage';
+import { api } from '../../utils/api';
 import { exportDataToFile } from '../../utils/export';
 import { onShow } from '@dcloudio/uni-app';
 import { checkAuth } from '../../utils/auth';
@@ -418,20 +419,8 @@ const handleStock = (bean: CoffeeBean, type: 'IN' | 'OUT') => {
         }
 
         try {
-          // 使用原子操作扣减库存，避免竞态条件
-          const result = await storage.updateBeanStock(bean.id, -amount);
-
-          if (!result.success) {
-            if (result.error === '库存不足') {
-              uni.showToast({ title: `库存不足，当前库存：${result.stock || 0}`, icon: 'none' });
-            } else {
-              uni.showToast({ title: result.error || '出库失败', icon: 'none' });
-            }
-            return;
-          }
-
-          // 创建出库记录
-          await storage.createLog({
+          // 由后端在单个事务中同时完成扣库存和写出库记录，避免双扣减
+          await api.createLog({
             id: generateId('log'),
             beanId: bean.id,
             type: 'OUT',
@@ -441,9 +430,17 @@ const handleStock = (bean: CoffeeBean, type: 'IN' | 'OUT') => {
 
           uni.showToast({ title: '出库成功', icon: 'success' });
           loadData();
-        } catch (error) {
+        } catch (error: any) {
           console.error('出库失败:', error);
-          uni.showToast({ title: '出库失败', icon: 'none' });
+          if (error?.code === 'INSUFFICIENT_STOCK') {
+            const currentStock = error?.details?.stock;
+            uni.showToast({
+              title: `库存不足，当前库存：${currentStock ?? 0}`,
+              icon: 'none'
+            });
+            return;
+          }
+          uni.showToast({ title: error?.message || '出库失败', icon: 'none' });
         }
       }
     }
