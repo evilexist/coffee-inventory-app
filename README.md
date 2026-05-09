@@ -36,7 +36,8 @@
 > fix: 修复库存更新条件逻辑避免SQL语法错误; 将出库操作改为后端原子事务以避免竞态条件.
 > v1.0.42:库存为0的咖啡豆会有额外的样式用于区分.
 - 5月9日 部署1次
-> v1.0.43:由TRAESOLO修复CodeReview中认定的缺陷[TRAE SOLO限免结束，切换至openrouter/inclusionai/ring-2.6-1t:free自定义模型。]
+> v1.0.43:提交了5月4日由TRAESOLO的修复CodeReview中认定的缺陷。
+> v1.0.44:优化了品饮记录页面的核心交互逻辑，引入了咖啡豆库存限制，并改善了页面头部的文案与统计展示。[by Xiaomi MIMO TokenPlan / mimo-v2.5-pro]
 
 ## 功能特性
 

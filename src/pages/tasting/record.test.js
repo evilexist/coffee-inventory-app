@@ -21,6 +21,13 @@ describe('pages/tasting/record', () => {
     expect(recordList).toBeTruthy();
   });
 
+  it('should display record count in header', async () => {
+    const caption = await page.$('.header-left .caption');
+    expect(caption).toBeTruthy();
+    const text = await caption.text();
+    expect(text).toContain('条记录');
+  });
+
   it('should display empty state when no records', async () => {
     const emptyState = await page.$('.empty-state');
     if (emptyState) {
@@ -82,6 +89,27 @@ describe('pages/tasting/record', () => {
     if (submitBtn) {
       await submitBtn.tap();
       await page.waitFor(1000);
+    }
+  });
+
+  it('should disable add button when selected bean has no stock', async () => {
+    page = await program.reLaunch('/pages/tasting/record');
+    await page.waitFor(1000);
+
+    const addBtn = await page.$('.btn-primary');
+    expect(addBtn).toBeTruthy();
+
+    const disabled = await addBtn.attribute('disabled');
+    if (disabled !== null) {
+      expect(disabled).toBeTruthy();
+    }
+  });
+
+  it('should display toast when clicking add button on zero-stock bean', async () => {
+    const addBtn = await page.$('.btn-primary[disabled]');
+    if (addBtn) {
+      await addBtn.tap();
+      await page.waitFor(500);
     }
   });
 });

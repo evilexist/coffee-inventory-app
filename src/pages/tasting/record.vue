@@ -3,16 +3,16 @@
     <view class="page-inner">
       <view class="header">
         <view class="header-left">
-          <text class="h2">{{ selectedBean ? `品饮：${selectedBean.name}${selectedBean.deletedAt ? '（已删除）' : ''}` : '所有品饮记录' }}</text>
+          <text class="h2">{{ selectedBean ? `${selectedBean.name}${selectedBean.deletedAt ? '（已删除）' : ''}` : '全部' }}</text>
           <text class="caption" style="margin-top: 4px; display: block">
-            {{ selectedBean ? '当前为单豆筛选' : '当前为全量列表，可选择豆子筛选' }}
+            共 {{ selectedBean ? filteredRecords.length : totalRecords }} 条记录
           </text>
         </view>
         <view class="header-actions">
           <button v-if="beans.length > 0" class="btn btn-ghost" @click="chooseBean" aria-label="选择豆子筛选">
             {{ selectedBean ? '切换豆子' : '选择豆子' }}
           </button>
-          <button class="btn btn-primary" @click="openAdd" aria-label="添加品饮记录">✏️ 添加记录</button>
+          <button class="btn btn-primary" :disabled="isAddDisabled" @click="openAdd" aria-label="添加品饮记录">✏️ 添加记录</button>
         </view>
       </view>
 
@@ -176,6 +176,7 @@ const loading = ref(false);
 const hasMore = ref(true);
 const currentPage = ref(1);
 const PAGE_LIMIT = 20;
+const totalRecords = ref(0);
 
 const form = reactive({
   dose: '',
@@ -213,6 +214,7 @@ const loadData = async () => {
       ? await storage.getBeanById(targetBeanId.value, true)
       : null;
     hasMore.value = recordsResult.pagination.hasMore;
+    totalRecords.value = recordsResult.pagination.total;
   } catch (error) {
     console.error('Failed to load data:', error);
     records.value = localCache.getTastingRecords().slice(0, PAGE_LIMIT);
@@ -221,6 +223,7 @@ const loadData = async () => {
       ? localCache.getBeans().find(b => b.id === targetBeanId.value) || null
       : null;
     hasMore.value = localCache.getTastingRecords().length > PAGE_LIMIT;
+    totalRecords.value = localCache.getTastingRecords().length;
   } finally {
     loading.value = false;
   }
@@ -268,6 +271,11 @@ const selectedBean = computed(() => {
     return selectedBeanDetail.value;
   }
   return beans.value.find(b => b.id === targetBeanId.value) || null;
+});
+
+const isAddDisabled = computed(() => {
+  if (!selectedBean.value) return false;
+  return (selectedBean.value.stock ?? 0) < 1;
 });
 
 const filteredRecords = computed(() => {
@@ -440,20 +448,27 @@ const chooseBean = () => {
 };
 
 const pickBeanForAdd = () => {
-  if (beans.value.length === 0) {
+  const activeBeans = beans.value.filter(b => !b.deletedAt);
+  if (activeBeans.length === 0) {
     uni.showToast({ title: '请先添加咖啡豆', icon: 'none' });
     return;
   }
   (uni as any).showActionSheet({
-    itemList: beans.value.map(b => b.name || '未命名'),
+    itemList: activeBeans.map(b => {
+      const name = b.name || '未命名';
+      return (b.stock ?? 0) < 1 ? `${name} / 无库存` : name;
+    }),
     success: (res: any) => {
-      const bean = beans.value[res.tapIndex];
-      if (bean) {
-        targetBeanId.value = bean.id;
-        selectedBeanDetail.value = bean;
-        resetForm();
-        showAddModal.value = true;
+      const bean = activeBeans[res.tapIndex];
+      if (!bean) return;
+      if ((bean.stock ?? 0) < 1) {
+        uni.showToast({ title: '该咖啡豆库存不足，无法记录品饮', icon: 'none' });
+        return;
       }
+      targetBeanId.value = bean.id;
+      selectedBeanDetail.value = bean;
+      resetForm();
+      showAddModal.value = true;
     }
   });
 };
@@ -461,6 +476,10 @@ const pickBeanForAdd = () => {
 const openAdd = () => {
   if (!targetBeanId.value) {
     pickBeanForAdd();
+    return;
+  }
+  if ((selectedBean.value?.stock ?? 0) < 1) {
+    uni.showToast({ title: '该咖啡豆库存不足，无法记录品饮', icon: 'none' });
     return;
   }
   resetForm();
@@ -503,6 +522,11 @@ const formatExtras = (record: TastingRecord) => {
   flex-shrink: 0;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.header-actions .btn[disabled] {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .record-list {
