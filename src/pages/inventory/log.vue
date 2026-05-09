@@ -14,9 +14,9 @@
             <button class="btn btn-primary" @click="goHome" aria-label="返回库存页">返回库存</button>
           </view>
         </view>
-        <view v-for="log in sortedLogs" :key="log.id" class="log-card card" :aria-label="`记录 ${getBeanName(log.beanId)} ${log.type === 'IN' ? '入库' : '出库'} ${log.amount}g`">
+        <view v-for="log in sortedLogs" :key="log.id" class="log-card card" :aria-label="`记录 ${log.beanName || getBeanName(log.beanId)} ${log.type === 'IN' ? '入库' : '出库'} ${log.amount}g`">
           <view class="log-info">
-            <text class="title">{{ getBeanName(log.beanId) }}</text>
+            <text class="title">{{ log.beanName || getBeanName(log.beanId) }}</text>
             <text class="log-date caption">{{ formatDate(log.date) }}</text>
             <text v-if="log.type === 'IN' && log.roastDate" class="log-date caption">烘焙 {{ log.roastDate }}</text>
           </view>
@@ -69,21 +69,13 @@ const loadData = async () => {
   loading.value = true;
   try {
     currentPage.value = 1;
-    
-    let beansResult: CoffeeBean | CoffeeBean[] | null;
-    if (targetBeanId.value) {
-      const bean = await storage.getBeanById(targetBeanId.value);
-      beansResult = bean ? [bean] : [];
-    } else {
-      const result = await storage.getBeans(1, 1000);
-      beansResult = result.data;
-    }
+    const beansResult = await storage.getBeans(1, 1000);
     
     const logsResult = targetBeanId.value
       ? await storage.getLogs(targetBeanId.value, 1, PAGE_LIMIT)
       : await storage.getLogs(undefined, 1, PAGE_LIMIT);
 
-    beans.value = Array.isArray(beansResult) ? beansResult : [];
+    beans.value = beansResult.data;
     logs.value = logsResult.data;
     hasMore.value = logsResult.pagination.hasMore;
   } catch (error) {

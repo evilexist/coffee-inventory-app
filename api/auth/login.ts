@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import sql from '../db';
-import { initializeUsers } from '../db/init';
+import { ensureAuthSchemaReady } from '../db/init';
 
 // JWT密钥
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -29,8 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // 初始化用户表
-    await initializeUsers();
+    await ensureAuthSchemaReady();
 
     const { username, password } = req.body;
 

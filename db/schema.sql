@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS coffee_beans (
   reference_price DECIMAL(10,2),
   stock DECIMAL(10,2) DEFAULT 0,
   description TEXT,
+  deleted_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -41,6 +42,7 @@ CREATE TABLE IF NOT EXISTS inventory_logs (
   id VARCHAR(36) PRIMARY KEY,
   user_id VARCHAR(36) NOT NULL,
   bean_id VARCHAR(36) NOT NULL,
+  name VARCHAR(255),
   type VARCHAR(10) NOT NULL CHECK (type IN ('IN', 'OUT')),
   amount DECIMAL(10,2) NOT NULL,
   date VARCHAR(50) NOT NULL,
@@ -54,6 +56,7 @@ CREATE TABLE IF NOT EXISTS inventory_logs (
 -- 品饮记录表
 CREATE TABLE IF NOT EXISTS tasting_records (
   id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
   bean_id VARCHAR(36) NOT NULL,
   date VARCHAR(50) NOT NULL,
   dose DECIMAL(10,2),
@@ -77,3 +80,8 @@ CREATE INDEX IF NOT EXISTS idx_inventory_logs_bean_id ON inventory_logs(bean_id)
 CREATE INDEX IF NOT EXISTS idx_tasting_records_bean_id ON tasting_records(bean_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_logs_date ON inventory_logs(date);
 CREATE INDEX IF NOT EXISTS idx_tasting_records_date ON tasting_records(date);
+CREATE INDEX IF NOT EXISTS idx_coffee_beans_user_id ON coffee_beans(user_id);
+CREATE INDEX IF NOT EXISTS idx_coffee_beans_user_deleted ON coffee_beans(user_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_inventory_logs_user_id ON inventory_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_tasting_records_user_id ON tasting_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_tasting_records_user_date ON tasting_records(user_id, date DESC);

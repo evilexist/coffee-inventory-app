@@ -35,7 +35,8 @@
 > 使用TRAE SOLO:GPT5.4模型
 > fix: 修复库存更新条件逻辑避免SQL语法错误; 将出库操作改为后端原子事务以避免竞态条件.
 > v1.0.42:库存为0的咖啡豆会有额外的样式用于区分.
-
+- 5月9日
+> TRAE SOLO限免结束，切换至openrouter/inclusionai/ring-2.6-1t:free自定义模型。
 
 ## 功能特性
 
@@ -117,12 +118,33 @@ cp .env.example .env.local
 # 编辑 .env.local，填入实际的数据库连接信息和 JWT 密钥
 ```
 
-4. 启动开发服务器
+4. 执行数据库迁移
+```sql
+-- 按顺序执行 db/migrations/*.sql
+-- 至少保证执行到 db/migrations/007_reconcile_current_schema.sql
+```
+
+说明：
+- `db/migrations/` 是数据库结构的唯一真相源
+- `db/schema.sql` 是当前结构快照
+- `api/db/init.ts` 与 `server.js` 只做 schema 校验，不再负责业务表建表
+
+5. 按需初始化默认用户
+```bash
+npm run seed:users
+```
+
+说明：
+- `USERS_CONFIG` 用于定义默认账号
+- 登录接口不再自动创建用户
+- 如果更新了默认账号配置，需要显式重新执行 `npm run seed:users`
+
+6. 启动开发服务器
 ```bash
 npm run dev
 ```
 
-5. 访问应用
+7. 访问应用
 - H5 端：http://localhost:5173
 - 微信小程序：使用微信开发者工具打开 `dist/dev/mp-weixin`
 

@@ -74,13 +74,23 @@ export const storage = {
     }
   },
 
-  async getBeanById(id: string): Promise<CoffeeBean | null> {
+  async getBeanById(id: string, includeDeleted = false): Promise<CoffeeBean | null> {
     try {
-      const result = await api.getBeans(1, 1000);
-      const normalized = result.data.map(normalizeCoffeeBean).filter(b => b.id);
-      localCache.saveBeans(normalized);
-      const bean = normalized.find(b => b.id === id);
-      return bean || null;
+      const result = await api.getBeanById(id, includeDeleted);
+      const normalized = normalizeCoffeeBean(result);
+
+      if (!normalized.deletedAt) {
+        const beans = localCache.getBeans();
+        const index = beans.findIndex(b => b.id === normalized.id);
+        if (index !== -1) {
+          beans[index] = normalized;
+        } else {
+          beans.push(normalized);
+        }
+        localCache.saveBeans(beans);
+      }
+
+      return normalized || null;
     } catch (error) {
       console.warn('Failed to fetch from API, using local cache:', error);
       const beans = localCache.getBeans();
@@ -89,15 +99,7 @@ export const storage = {
   },
 
   async saveBeans(beans: CoffeeBean[]): Promise<void> {
-    localCache.saveBeans(beans);
-    // 同步到服务器
-    for (const bean of beans) {
-      try {
-        await api.createBean(bean);
-      } catch (error) {
-        console.warn('Failed to sync bean to API:', error);
-      }
-    }
+    throw new Error('saveBeans 已禁用：写操作必须以后端接口成功结果为准');
   },
 
   async createBean(bean: CoffeeBean): Promise<CoffeeBean> {
@@ -117,23 +119,7 @@ export const storage = {
       return result;
     } catch (error: any) {
       console.error('Failed to create bean via API:', error);
-      
-      const localBean = { 
-        ...bean, 
-        _synced: false, 
-        _syncError: error.message || '同步失败' 
-      };
-      
-      const beans = localCache.getBeans();
-      const index = beans.findIndex(b => b.id === localBean.id);
-      if (index !== -1) {
-        beans[index] = localBean;
-      } else {
-        beans.push(localBean);
-      }
-      localCache.saveBeans(beans);
-      
-      throw error; // 抛出错误让UI处理
+      throw error;
     }
   },
 
@@ -149,17 +135,9 @@ export const storage = {
       return { success: true, data: result, synced: true };
     } catch (error: any) {
       console.error('Failed to update bean via API:', error);
-      
-      const beans = localCache.getBeans();
-      const index = beans.findIndex(b => b.id === bean.id);
-      if (index !== -1) {
-        beans[index] = { ...bean, _synced: false, _syncError: error.message || '同步失败' };
-        localCache.saveBeans(beans);
-      }
-      
       return { 
         success: false, 
-        data: bean, 
+        data: undefined, 
         error: error.message || '更新失败', 
         synced: false 
       };
@@ -174,10 +152,6 @@ export const storage = {
       return { success: true, synced: true };
     } catch (error: any) {
       console.error('Failed to delete bean via API:', error);
-      
-      const beans = localCache.getBeans().filter(b => b.id !== id);
-      localCache.saveBeans(beans);
-      
       return { 
         success: false, 
         error: error.message || '删除失败', 
@@ -252,14 +226,9 @@ export const storage = {
       return { success: true, data: result, synced: true };
     } catch (error: any) {
       console.error('Failed to create log via API:', error);
-      
-      const logs = localCache.getLogs();
-      logs.push(log);
-      localCache.saveLogs(logs);
-      
       return { 
         success: false, 
-        data: log, 
+        data: undefined, 
         error: error.message || '创建入库记录失败', 
         synced: false 
       };
@@ -274,10 +243,6 @@ export const storage = {
       return { success: true, synced: true };
     } catch (error: any) {
       console.error('Failed to delete log via API:', error);
-      
-      const logs = localCache.getLogs().filter(l => l.id !== id);
-      localCache.saveLogs(logs);
-      
       return { 
         success: false, 
         error: error.message || '删除失败', 
@@ -335,10 +300,6 @@ export const storage = {
       if (error.data && error.data.success === false) {
         return { success: false, error: error.data.error, stock: error.data.stock };
       }
-      // 失败时保存到本地缓存（离线模式）
-      const records = localCache.getTastingRecords();
-      records.push(record);
-      localCache.saveTastingRecords(records);
       return { success: false, error: error.message || '保存失败' };
     }
   },
@@ -355,17 +316,9 @@ export const storage = {
       return { success: true, data: result, synced: true };
     } catch (error: any) {
       console.error('Failed to update tasting record via API:', error);
-      
-      const records = localCache.getTastingRecords();
-      const index = records.findIndex(r => r.id === record.id);
-      if (index !== -1) {
-        records[index] = record;
-        localCache.saveTastingRecords(records);
-      }
-      
       return { 
         success: false, 
-        data: record, 
+        data: undefined, 
         error: error.message || '更新失败', 
         synced: false 
       };
@@ -380,10 +333,6 @@ export const storage = {
       return { success: true, synced: true };
     } catch (error: any) {
       console.error('Failed to delete tasting record via API:', error);
-      
-      const records = localCache.getTastingRecords().filter(r => r.id !== id);
-      localCache.saveTastingRecords(records);
-      
       return { 
         success: false, 
         error: error.message || '删除失败', 
@@ -441,7 +390,8 @@ const normalizeCoffeeBean = (raw: any): CoffeeBean => {
     roastDate: normalizeString(raw?.roast_date || raw?.roastDate),
     referencePrice: normalizeOptionalNumber(raw?.reference_price || raw?.referencePrice),
     stock: Math.round(normalizeNumber(raw?.stock) || 0),
-    description
+    description,
+    deletedAt: normalizeString(raw?.deleted_at || raw?.deletedAt) || undefined
   };
 };
 
@@ -460,6 +410,7 @@ const normalizeInventoryLog = (raw: any): InventoryLog => {
   return {
     id: normalizeString(raw?.id),
     beanId: normalizeString(raw?.bean_id || raw?.beanId),
+    beanName: normalizeString(raw?.bean_name || raw?.beanName) || undefined,
     type: raw?.type || 'IN',
     amount: Math.round(normalizeNumber(raw?.amount) || 0),
     date: normalizeString(raw?.date),
@@ -472,6 +423,7 @@ const normalizeTastingRecord = (raw: any): TastingRecord => {
   return {
     id: normalizeString(raw?.id),
     beanId: normalizeString(raw?.bean_id || raw?.beanId),
+    beanName: normalizeString(raw?.bean_name || raw?.beanName) || undefined,
     date: normalizeString(raw?.date),
     dose: normalizeOptionalNumber(raw?.dose),
     brewMethod: normalizeString(raw?.brew_method || raw?.brewMethod),

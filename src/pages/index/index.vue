@@ -483,26 +483,9 @@ const confirmIn = async () => {
   }
 
   try {
-    const allBeansResult = await storage.getBeans(1, 1000);
-    const allBeans = allBeansResult.data;
-    const target = allBeans.find(b => b.id === inBean.value!.id);
-    if (!target) {
-      uni.showToast({ title: '未找到咖啡豆', icon: 'none' });
-      closeInModal();
-      return;
-    }
-
-    target.stock = Math.max(0, Math.round(target.stock + amount));
-    target.roastDate = roastDate;
-    const updateResult = await storage.updateBean(target);
-
-    if (!updateResult.success) {
-      uni.showToast({ title: `入库成功，但云端同步失败：${updateResult.error}`, icon: 'none' });
-    }
-
     const logResult = await storage.createLog({
       id: generateId('log'),
-      beanId: target.id,
+      beanId: inBean.value.id,
       type: 'IN',
       amount,
       date: new Date().toISOString(),
@@ -510,7 +493,8 @@ const confirmIn = async () => {
     });
 
     if (!logResult.success) {
-      uni.showToast({ title: `入库成功，但入库记录创建失败：${logResult.error}`, icon: 'none' });
+      uni.showToast({ title: logResult.error || '入库失败', icon: 'none' });
+      return;
     }
 
     uni.showToast({ title: '入库成功' });
@@ -534,8 +518,7 @@ const deleteBean = (id: string) => {
           uni.showToast({ title: '删除成功', icon: 'success' });
           loadData();
         } else {
-          uni.showToast({ title: `删除成功，但云端同步失败：${result.error}`, icon: 'none' });
-          loadData();
+          uni.showToast({ title: result.error || '删除失败', icon: 'none' });
         }
       }
     }

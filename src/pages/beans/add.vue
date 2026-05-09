@@ -218,7 +218,7 @@
 import { ref, reactive } from 'vue';
 import { storage } from '../../utils/storage';
 import { CoffeeBean } from '../../types';
-import { generateBeanId, generateId } from '../../utils/common';
+import { generateBeanId } from '../../utils/common';
 
 const roastLevels = ['极浅烘焙', '浅度烘焙', '浅中度烘焙', '中度烘焙', '中深度烘焙', '深烘焙', '极深烘焙'];
 const roastIndex = ref(3); // 默认为中度烘焙
@@ -370,28 +370,7 @@ const save = async () => {
   };
 
   try {
-    const savedBean = await storage.createBean(newBean);
-
-    // 如果初始库存大于0，自动创建入库记录
-    if (stockNum > 0) {
-      const logResult = await storage.createLog({
-        id: generateId('log'),
-        beanId: savedBean.id,  // 使用服务器返回的真实ID
-        type: 'IN',
-        amount: stockNum,
-        date: new Date().toISOString(),
-        roastDate: roastDate || undefined,
-        note: '由系统初始化入库'
-      });
-      
-      if (!logResult.success) {
-        console.error('创建入库记录失败:', logResult.error);
-        uni.showToast({
-          title: '咖啡豆已保存，但入库记录创建失败',
-          icon: 'none'
-        });
-      }
-    }
+    await storage.createBean(newBean);
 
     uni.showToast({ title: '保存成功' });
     setTimeout(() => {

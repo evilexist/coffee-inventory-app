@@ -28,158 +28,92 @@ if (!JWT_SECRET) {
 const JWT_EXPIRES_IN = '7d';
 
 // ==================== 数据库初始化 ====================
+// 业务表结构以 db/migrations 与 db/schema.sql 为准；本地服务器只做校验，不再偷偷建表。
 
-async function initializeDatabase() {
+const AUTH_SCHEMA = {
+  users: ['id', 'username', 'password_hash', 'display_name', 'is_active', 'created_at', 'last_login']
+};
+
+const BUSINESS_SCHEMA = {
+  coffee_beans: [
+    'id', 'user_id', 'name', 'origin_country', 'origin_region', 'origin', 'brand_roaster',
+    'producer', 'altitude', 'variety', 'flavor_notes', 'roast_level', 'agtron', 'process',
+    'roast_date', 'reference_price', 'stock', 'description', 'deleted_at', 'created_at', 'updated_at'
+  ],
+  inventory_logs: ['id', 'user_id', 'bean_id', 'name', 'type', 'amount', 'date', 'roast_date', 'note', 'created_at'],
+  tasting_records: [
+    'id', 'user_id', 'bean_id', 'date', 'dose', 'brew_method', 'dripper', 'filter_paper',
+    'grinder', 'grind_size', 'water_temp', 'water_quality', 'ratio', 'rating', 'notes',
+    'improvement', 'created_at'
+  ]
+};
+
+const schemaValidationState = {
+  auth: false,
+  business: false,
+  application: false
+};
+
+async function getTableColumns(tableName) {
+  const result = await pool.query(
+    `SELECT column_name
+     FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = $1`,
+    [tableName]
+  );
+  return new Set(result.rows.map((row) => row.column_name));
+}
+
+async function ensureSchemaReady(requiredSchema, cacheKey) {
   try {
-    // 创建用户表
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id VARCHAR(36) PRIMARY KEY,
-        username VARCHAR(100) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
-        display_name VARCHAR(100),
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_login TIMESTAMP
-      )
-    `);
+    if (schemaValidationState[cacheKey]) {
+      return;
+    }
 
-    // 创建咖啡豆表
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS coffee_beans (
-        id VARCHAR(36) PRIMARY KEY,
-        user_id VARCHAR(36) NOT NULL,
-        name VARCHAR(255) NOT NULL,
-        origin_country VARCHAR(100),
-        origin_region VARCHAR(100),
-        origin VARCHAR(255),
-        brand_roaster VARCHAR(255),
-        producer VARCHAR(255),
-        altitude VARCHAR(100),
-        variety VARCHAR(100),
-        flavor_notes TEXT,
-        roast_level VARCHAR(50),
-        process VARCHAR(100),
-        roast_date VARCHAR(50),
-        reference_price DECIMAL(10,2),
-        stock DECIMAL(10,2) DEFAULT 0,
-        description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
+    const missingByTable = [];
 
-    // 创建出入库记录表
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS inventory_logs (
-        id VARCHAR(36) PRIMARY KEY,
-        user_id VARCHAR(36) NOT NULL,
-        bean_id VARCHAR(36) NOT NULL,
-        type VARCHAR(10) NOT NULL CHECK (type IN ('IN', 'OUT')),
-        amount DECIMAL(10,2) NOT NULL,
-        date VARCHAR(50) NOT NULL,
-        roast_date VARCHAR(50),
-        note TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (bean_id) REFERENCES coffee_beans(id) ON DELETE CASCADE
-      )
-    `);
+    for (const [tableName, requiredColumns] of Object.entries(requiredSchema)) {
+      const existingColumns = await getTableColumns(tableName);
+      const missingColumns = requiredColumns.filter((column) => !existingColumns.has(column));
+      if (missingColumns.length > 0) {
+        missingByTable.push(`${tableName}: ${missingColumns.join(', ')}`);
+      }
+    }
 
-    // 创建品饮记录表
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS tasting_records (
-        id VARCHAR(36) PRIMARY KEY,
-        user_id VARCHAR(36) NOT NULL,
-        bean_id VARCHAR(36) NOT NULL,
-        date VARCHAR(50) NOT NULL,
-        dose DECIMAL(10,2),
-        brew_method VARCHAR(100),
-        dripper VARCHAR(100),
-        filter_paper VARCHAR(100),
-        grinder VARCHAR(100),
-        grind_size VARCHAR(50),
-        water_temp DECIMAL(5,2),
-        ratio VARCHAR(20),
-        rating INTEGER CHECK (rating >= 1 AND rating <= 5),
-        notes TEXT,
-        improvement TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (bean_id) REFERENCES coffee_beans(id) ON DELETE CASCADE
-      )
-    `);
+    if (missingByTable.length > 0) {
+      throw new Error(
+        `数据库结构不完整，请先执行 db/migrations/007_reconcile_current_schema.sql。缺失项: ${missingByTable.join(' | ')}`
+      );
+    }
 
-    // 创建索引
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_inventory_logs_bean_id ON inventory_logs(bean_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasting_records_bean_id ON tasting_records(bean_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_inventory_logs_date ON inventory_logs(date)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasting_records_date ON tasting_records(date)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_coffee_beans_user_id ON coffee_beans(user_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_inventory_logs_user_id ON inventory_logs(user_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasting_records_user_id ON tasting_records(user_id)`);
-
-    console.log('✅ 数据库表结构初始化完成');
+    schemaValidationState[cacheKey] = true;
   } catch (error) {
     console.error('数据库初始化失败:', error);
     throw error;
   }
 }
 
+async function ensureAuthSchemaReady() {
+  await ensureSchemaReady(AUTH_SCHEMA, 'auth');
+}
+
+async function ensureBusinessSchemaReady() {
+  await ensureSchemaReady(BUSINESS_SCHEMA, 'business');
+}
+
+async function ensureApplicationSchemaReady() {
+  await ensureSchemaReady({ ...AUTH_SCHEMA, ...BUSINESS_SCHEMA }, 'application');
+}
+
 // ==================== 用户管理 ====================
-
-function getUsersFromEnv() {
-  const usersEnv = process.env.USERS_CONFIG || '';
-  if (!usersEnv) return [];
-
-  try {
-    return usersEnv.split(';').map(userStr => {
-      const [username, password, display_name] = userStr.split(':');
-      return {
-        username: username || '',
-        password: password || '',
-        display_name: display_name || username || ''
-      };
-    }).filter(user => user.username && user.password);
-  } catch (error) {
-    console.error('解析用户配置失败:', error);
-    return [];
-  }
-}
-
-async function initializeUsers() {
-  try {
-    await initializeDatabase();
-
-    const envUsers = getUsersFromEnv();
-    for (const envUser of envUsers) {
-      const existingUser = await pool.query(
-        'SELECT id FROM users WHERE username = $1',
-        [envUser.username]
-      );
-
-      if (existingUser.rows.length === 0) {
-        const passwordHash = await bcrypt.hash(envUser.password, 10);
-        const userId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-        await pool.query(
-          'INSERT INTO users (id, username, password_hash, display_name) VALUES ($1, $2, $3, $4)',
-          [userId, envUser.username, passwordHash, envUser.display_name]
-        );
-
-        console.log(`✅ 初始化用户: ${envUser.username}`);
-      }
-    }
-  } catch (error) {
-    console.error('初始化用户表失败:', error);
-  }
-}
+// 默认用户初始化已迁移到独立脚本：npm run seed:users
 
 // ==================== 认证中间件 ====================
 
 async function authenticate(req, res) {
   try {
+    await ensureAuthSchemaReady();
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -238,8 +172,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 async function performLogin(req, res) {
-  // 初始化用户表
-  await initializeUsers();
+  await ensureAuthSchemaReady();
 
   const { username, password } = req.body;
 
@@ -797,7 +730,7 @@ app.listen(PORT, async () => {
   console.log(`📦 咖啡豆API: http://localhost:${PORT}/api/beans`);
   console.log(`📊 出入库API: http://localhost:${PORT}/api/inventory`);
   console.log(`☕ 品饮记录API: http://localhost:${PORT}/api/tasting`);
-
-  // 初始化用户表
-  await initializeUsers();
+  await ensureApplicationSchemaReady();
+  console.log('✅ Database schema validated');
+  console.log('ℹ️ 默认用户初始化已独立，请按需执行 npm run seed:users');
 });

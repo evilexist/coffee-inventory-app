@@ -122,7 +122,35 @@ npm install
 
 这是一个运行在电脑上的"后台程序"，负责处理数据存储、用户登录等操作。前端（浏览器界面）通过它来存取数据。
 
-### 5.2 启动步骤
+### 5.2 先执行数据库迁移
+
+从 2026-05-03 开始，项目不再通过运行时代码自动创建业务表结构。数据库结构的唯一真相源是：
+
+- `db/migrations/`
+- `db/schema.sql`（结构快照）
+
+你必须先在数据库里按顺序执行 `db/migrations/*.sql`，至少确保执行到：
+
+```sql
+db/migrations/007_reconcile_current_schema.sql
+```
+
+否则 `node server.js` 或云端 API 会在启动校验时报“数据库结构不完整”。
+
+### 5.3 初始化默认用户
+
+如果你依赖 `.env.local` 里的 `USERS_CONFIG` 默认账号，请在启动服务前执行：
+
+```bash
+npm run seed:users
+```
+
+注意：
+
+- 登录接口不再自动创建用户
+- `npm run seed:users` 可重复执行；已存在的用户名会自动跳过
+
+### 5.4 启动步骤
 
 1. **确保你在项目目录下**（终端中应该显示项目路径）
 2. 输入以下命令启动服务器：
@@ -134,7 +162,7 @@ npm install
    ```
    Server is running on port 3000
    Database connected successfully
-   Database initialized
+   Database schema validated
    Initialized users: riku, testtest, guest
    ```
 

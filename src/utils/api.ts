@@ -66,8 +66,8 @@ export const api = {
     return handleApiResponse(res);
   },
 
-  async getBeanById(id: string): Promise<CoffeeBean> {
-    const res = await fetch(`${API_BASE}/beans?id=${id}`, {
+  async getBeanById(id: string, includeDeleted = false): Promise<CoffeeBean> {
+    const res = await fetch(`${API_BASE}/beans?id=${id}&includeDeleted=${includeDeleted ? 'true' : 'false'}`, {
       headers: getAuthHeaders(),
     });
     return handleApiResponse<CoffeeBean>(res);

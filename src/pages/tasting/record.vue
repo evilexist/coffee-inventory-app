@@ -3,7 +3,7 @@
     <view class="page-inner">
       <view class="header">
         <view class="header-left">
-          <text class="h2">{{ selectedBean ? `品饮：${selectedBean.name}` : '所有品饮记录' }}</text>
+          <text class="h2">{{ selectedBean ? `品饮：${selectedBean.name}${selectedBean.deletedAt ? '（已删除）' : ''}` : '所有品饮记录' }}</text>
           <text class="caption" style="margin-top: 4px; display: block">
             {{ selectedBean ? '当前为单豆筛选' : '当前为全量列表，可选择豆子筛选' }}
           </text>
@@ -33,7 +33,7 @@
           <view class="record-header">
             <text class="record-date caption">
               {{ formatDate(record.date) }}
-              <text v-if="!targetBeanId && getBeanName(record.beanId)" class="bean-name"> · {{ getBeanName(record.beanId) }}</text>
+              <text v-if="!targetBeanId && (record.beanName || getBeanName(record.beanId))" class="bean-name"> · {{ record.beanName || getBeanName(record.beanId) }}</text>
             </text>
             <text class="record-rating" aria-label="评分">{{ '⭐'.repeat(record.rating) }}</text>
           </view>
@@ -167,6 +167,7 @@ import { generateId } from '../../utils/common';
 const records = ref<TastingRecord[]>([]);
 const beans = ref<CoffeeBean[]>([]);
 const targetBeanId = ref('');
+const selectedBeanDetail = ref<CoffeeBean | null>(null);
 const showAddModal = ref(false);
 const isSubmitting = ref(false);
 
@@ -208,11 +209,17 @@ const loadData = async () => {
     const beansResult = await storage.getBeans(1, 1000);
     records.value = recordsResult.data;
     beans.value = beansResult.data;
+    selectedBeanDetail.value = targetBeanId.value
+      ? await storage.getBeanById(targetBeanId.value, true)
+      : null;
     hasMore.value = recordsResult.pagination.hasMore;
   } catch (error) {
     console.error('Failed to load data:', error);
     records.value = localCache.getTastingRecords().slice(0, PAGE_LIMIT);
     beans.value = localCache.getBeans();
+    selectedBeanDetail.value = targetBeanId.value
+      ? localCache.getBeans().find(b => b.id === targetBeanId.value) || null
+      : null;
     hasMore.value = localCache.getTastingRecords().length > PAGE_LIMIT;
   } finally {
     loading.value = false;
@@ -256,7 +263,8 @@ onShow(() => {
 });
 
 const selectedBean = computed(() => {
-  return beans.value.find(b => b.id === targetBeanId.value);
+  if (!targetBeanId.value) return null;
+  return selectedBeanDetail.value || beans.value.find(b => b.id === targetBeanId.value) || null;
 });
 
 const filteredRecords = computed(() => {
@@ -338,11 +346,14 @@ const saveRecord = async () => {
       return;
     }
 
-    const allBeansResult = await storage.getBeans(1, 1000);
-    const allBeans = allBeansResult.data;
-    const targetBean = allBeans.find(b => b.id === targetBeanId.value);
+    const targetBean = await storage.getBeanById(targetBeanId.value, true);
     if (!targetBean) {
       uni.showToast({ title: '未找到咖啡豆', icon: 'none' });
+      return;
+    }
+
+    if (targetBean.deletedAt) {
+      uni.showToast({ title: '该咖啡豆已删除，无法继续品饮', icon: 'none' });
       return;
     }
 
@@ -379,7 +390,11 @@ const saveRecord = async () => {
     };
 
     // 后端会自动处理库存扣减和出库记录创建
-    await storage.createTastingRecord(newRecord);
+    const result = await storage.createTastingRecord(newRecord);
+    if (!result.success) {
+      uni.showToast({ title: result.error || '保存失败', icon: 'none' });
+      return;
+    }
 
     uni.showToast({ title: '记录成功' });
     resetForm();

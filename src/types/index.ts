@@ -23,6 +23,7 @@ export interface CoffeeBean {
   referencePrice?: number;
   stock: number; // in grams
   description?: string;
+  deletedAt?: string;
   // 同步状态字段（仅前端使用，不发送到服务器）
   _synced?: boolean;
   _syncError?: string;
@@ -31,6 +32,7 @@ export interface CoffeeBean {
 export interface InventoryLog {
   id: string;
   beanId: string;
+  beanName?: string;
   type: 'IN' | 'OUT';
   amount: number;
   date: string;
@@ -41,6 +43,7 @@ export interface InventoryLog {
 export interface TastingRecord {
   id: string;
   beanId: string;
+  beanName?: string;
   date: string;
   dose?: number;
   brewMethod: string;

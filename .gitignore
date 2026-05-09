@@ -34,6 +34,7 @@ Thumbs.db
 # 临时文件
 tmp/
 temp/
+.tmp-verify-*/
 
 # 数据库相关
 *.sqlite

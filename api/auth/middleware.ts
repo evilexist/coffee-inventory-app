@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import jwt from 'jsonwebtoken';
 import sql from '../db';
-import { initializeUsers } from '../db/init';
+import { ensureAuthSchemaReady } from '../db/init';
 
 // JWT密钥
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -13,6 +13,8 @@ if (!JWT_SECRET) {
 // 认证中间件
 export async function authenticate(req: VercelRequest, res: VercelResponse): Promise<string | null> {
   try {
+    await ensureAuthSchemaReady();
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -52,4 +54,3 @@ export async function authenticate(req: VercelRequest, res: VercelResponse): Pro
     return null;
   }
 }
-
