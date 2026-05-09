@@ -264,7 +264,10 @@ onShow(() => {
 
 const selectedBean = computed(() => {
   if (!targetBeanId.value) return null;
-  return selectedBeanDetail.value || beans.value.find(b => b.id === targetBeanId.value) || null;
+  if (selectedBeanDetail.value && selectedBeanDetail.value.id === targetBeanId.value) {
+    return selectedBeanDetail.value;
+  }
+  return beans.value.find(b => b.id === targetBeanId.value) || null;
 });
 
 const filteredRecords = computed(() => {
@@ -423,10 +426,14 @@ const chooseBean = () => {
     success: (res: any) => {
       if (res.tapIndex === 0) {
         targetBeanId.value = '';
+        selectedBeanDetail.value = null;
       } else {
         const idx = res.tapIndex - 1;
         const bean = beans.value[idx];
-        if (bean) targetBeanId.value = bean.id;
+        if (bean) {
+          targetBeanId.value = bean.id;
+          selectedBeanDetail.value = bean;
+        }
       }
     }
   });
@@ -443,6 +450,7 @@ const pickBeanForAdd = () => {
       const bean = beans.value[res.tapIndex];
       if (bean) {
         targetBeanId.value = bean.id;
+        selectedBeanDetail.value = bean;
         resetForm();
         showAddModal.value = true;
       }
