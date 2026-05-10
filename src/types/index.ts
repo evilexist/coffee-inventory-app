@@ -50,11 +50,11 @@ export interface TastingRecord {
   dripper?: string;
   filterPaper?: string;
   grinder?: string;
-  grindSize: string;
-  waterTemp: number;
+  grindSize?: string;
+  waterTemp?: number;
   waterQuality?: string; // 水质描述，如"农夫山泉70ppm"
   ratio: string; // e.g., "1:15"
   rating: number; // 1-5
-  notes: string;
+  notes?: string;
   improvement?: string;
 }

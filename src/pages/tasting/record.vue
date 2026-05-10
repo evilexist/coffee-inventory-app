@@ -93,11 +93,11 @@
             />
           </view>
           <view class="form-group">
-            <text class="label">滤杯（选填）</text>
+            <text class="label">滤杯 <text class="label-optional">（选填）</text></text>
             <input class="input" v-model="form.dripper" placeholder="例如：V60 / Kalita / Origami" aria-label="滤杯" />
           </view>
           <view class="form-group">
-            <text class="label">滤纸（选填）</text>
+            <text class="label">滤纸 <text class="label-optional">（选填）</text></text>
             <input class="input" v-model="form.filterPaper" placeholder="例如：锥形 / 扇形 / 155" aria-label="滤纸" />
           </view>
           <view class="form-group">
@@ -109,22 +109,34 @@
             <slider min="4" max="20" step="1" show-value :value="form.ratioWater" @change="onRatioChange" />
           </view>
           <view class="form-group">
-            <text class="label">水温</text>
+            <text class="label">水温 <text class="label-optional">（选填）</text></text>
             <view class="input-with-suffix">
               <input class="input" type="number" v-model="form.waterTemp" placeholder="例如：92℃" aria-label="水温（℃）" />
               <text class="suffix">℃</text>
             </view>
           </view>
           <view class="form-group">
-            <text class="label">水质</text>
+            <text class="label">水质 <text class="label-optional">（选填）</text></text>
             <input class="input" v-model="form.waterQuality" placeholder="例如：农夫山泉70ppm" aria-label="水质" />
           </view>
           <view class="form-group">
-            <text class="label">磨豆机</text>
-            <input class="input" v-model="form.grinder" placeholder="例如：EK43 / Niche Zero" aria-label="磨豆机" />
+            <text class="label">磨豆机 <text class="label-optional">（选填）</text></text>
+            <radio-group class="radio-group" @change="onGrinderChange" aria-label="磨豆机选择">
+              <label v-for="opt in grinderOptions" :key="opt" class="radio-item">
+                <radio :value="opt" :checked="form.grinderChoice === opt" />
+                <text class="radio-text">{{ opt }}</text>
+              </label>
+            </radio-group>
+            <input
+              v-if="form.grinderChoice === '其他'"
+              class="input mt-10"
+              v-model="form.grinderCustom"
+              placeholder="请输入本次冲煮使用的磨豆机"
+              aria-label="自定义磨豆机"
+            />
           </view>
           <view class="form-group">
-            <text class="label">研磨度</text>
+            <text class="label">研磨度 <text class="label-optional">（选填）</text></text>
             <input class="input" v-model="form.grindSize" placeholder="例如：中细研磨" aria-label="研磨度" />
           </view>
           <view class="form-group">
@@ -132,11 +144,11 @@
             <slider min="1" max="5" show-value :value="form.rating" @change="onRatingChange" />
           </view>
           <view class="form-group">
-            <text class="label">感受</text>
+            <text class="label">感受 <text class="label-optional">（选填）</text></text>
             <textarea class="textarea" v-model="form.notes" placeholder="风味表现如何？" aria-label="感受" />
           </view>
           <view class="form-group">
-            <text class="label">改进意见</text>
+            <text class="label">改进意见 <text class="label-optional">（选填）</text></text>
             <textarea class="textarea" v-model="form.improvement" placeholder="下次想怎么调整？" aria-label="改进意见" />
           </view>
         </scroll-view>
@@ -187,7 +199,8 @@ const form = reactive({
   ratioWater: 15,
   waterTemp: '',
   waterQuality: '',
-  grinder: '',
+  grinderChoice: 'MAVO幻刺Pro',
+  grinderCustom: '',
   grindSize: '',
   rating: 5,
   notes: '',
@@ -195,6 +208,7 @@ const form = reactive({
 });
 
 const brewMethodOptions = ['手冲', '杯测', '聪明杯', '爱乐压', '法压壶', '冷萃', '冰滴', '其他'];
+const grinderOptions = ['MAVO幻刺Pro', '司令官C40', '1ZPresso', '迈赫迪EK43', 'Ditting807', 'Baratza Encore', 'Fellow Ode', '其他'];
 
 onLoad((options: any) => {
   if (options.beanId) {
@@ -299,6 +313,10 @@ const onBrewMethodChange = (e: any) => {
   form.brewMethodChoice = e.detail.value;
 };
 
+const onGrinderChange = (e: any) => {
+  form.grinderChoice = e.detail.value;
+};
+
 const resetForm = () => {
   form.dose = '';
   form.brewMethodChoice = '手冲';
@@ -308,7 +326,8 @@ const resetForm = () => {
   form.ratioWater = 15;
   form.waterTemp = '';
   form.waterQuality = '';
-  form.grinder = '';
+  form.grinderChoice = 'MAVO幻刺Pro';
+  form.grinderCustom = '';
   form.grindSize = '';
   form.rating = 5;
   form.notes = '';
@@ -364,7 +383,7 @@ const saveRecord = async () => {
     }
 
     if (targetBean.deletedAt) {
-      uni.showToast({ title: '该咖啡豆已删除，无法继续品饮', icon: 'none' });
+      uni.showToast({ title: '该咖啡豆已删除，无法记录品饮', icon: 'none' });
       return;
     }
 
@@ -382,6 +401,15 @@ const saveRecord = async () => {
       return;
     }
 
+    const grinder = form.grinderChoice === '其他'
+      ? form.grinderCustom.trim()
+      : form.grinderChoice;
+
+    if (form.grinderChoice === '其他' && !grinder) {
+      uni.showToast({ title: '请输入磨豆机型号', icon: 'none' });
+      return;
+    }
+
     const newRecord: TastingRecord = {
       id: generateId('tasting'),
       beanId: targetBeanId.value,
@@ -390,7 +418,7 @@ const saveRecord = async () => {
       brewMethod,
       dripper: form.dripper.trim(),
       filterPaper: form.filterPaper.trim(),
-      grinder: form.grinder.trim(),
+      grinder,
       ratio: `1:${form.ratioWater}`,
       waterTemp: waterNum ?? 0,
       waterQuality: form.waterQuality.trim() || undefined,
@@ -428,7 +456,10 @@ const chooseBean = () => {
     uni.showToast({ title: '请先添加咖啡豆', icon: 'none' });
     return;
   }
-  const list = ['全部', ...beans.value.map(b => b.name || '未命名')];
+  const list = ['全部', ...beans.value.map(b => {
+    const name = b.name || '未命名';
+    return (b.stock ?? 0) < 1 && !b.deletedAt ? `${name} / 无库存` : name;
+  })];
   (uni as any).showActionSheet({
     itemList: list,
     success: (res: any) => {
@@ -708,6 +739,13 @@ const formatExtras = (record: TastingRecord) => {
   font-size: var(--font-size-md);
   color: var(--text);
   font-weight: 600;
+}
+
+.label-optional {
+  font-weight: 400;
+  font-size: var(--font-size-sm);
+  color: var(--text-subtle);
+  opacity: 0.7;
 }
 
 .input, .textarea {
