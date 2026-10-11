@@ -13,12 +13,12 @@ function getAuthHeaders(): HeadersInit {
 
 export const api = {
   // 用户认证相关 - 使用JWT
-  async login(username: string, password: string): Promise<any> {
+  async login(username: string, password: string, rememberMe = true): Promise<any> {
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, rememberMe }),
       });
       
       if (!res.ok) {

@@ -64,3 +64,6 @@ coverage/
 test-results/
 playwright-report/
 playwright/.cache/
+
+# 规划文档
+documents/plans/

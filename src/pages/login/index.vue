@@ -31,6 +31,15 @@
           />
         </view>
         
+        <view class="remember-row">
+          <label class="remember-label" @click="rememberMe = !rememberMe">
+            <view class="checkbox" :class="{ checked: rememberMe }">
+              <text v-if="rememberMe" class="checkbox-mark">✓</text>
+            </view>
+            <text class="remember-text">记住我，30天内免登录</text>
+          </label>
+        </view>
+
         <button 
           class="btn btn-primary login-btn" 
           @click="handleLogin"
@@ -61,6 +70,7 @@ export default {
     const password = ref('');
     const loading = ref(false);
     const error = ref('');
+    const rememberMe = ref(true);
     const version = ref(pkg.version);
     
     const handleLogin = async () => {
@@ -74,7 +84,7 @@ export default {
       
       try {
         // 调用登录API
-        const result = await api.login(username.value, password.value);
+        const result = await api.login(username.value, password.value, rememberMe.value);
         
         if (!result.success) {
           error.value = result.error || '登录失败，请稍后重试';
@@ -104,6 +114,7 @@ export default {
       password,
       loading,
       error,
+      rememberMe,
       version,
       handleLogin
     };
@@ -148,6 +159,47 @@ export default {
 
 .form-group {
   margin-bottom: 20px;
+}
+
+.remember-row {
+  margin-top: -4px;
+  margin-bottom: 4px;
+}
+
+.remember-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--border);
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-bg);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.checkbox.checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.checkbox-mark {
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.remember-text {
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 .label {

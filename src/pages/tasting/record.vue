@@ -5,7 +5,7 @@
         <view class="header-left">
           <text class="h2">{{ selectedBean ? `${selectedBean.name}${selectedBean.deletedAt ? '（已删除）' : ''}` : '全部' }}</text>
           <text class="caption" style="margin-top: 4px; display: block">
-            共 {{ selectedBean ? filteredRecords.length : totalRecords }} 条记录
+            共 {{ totalRecords }} 条记录
           </text>
         </view>
         <view class="header-actions">
@@ -220,7 +220,8 @@ const loadData = async () => {
   loading.value = true;
   try {
     currentPage.value = 1;
-    const recordsResult = await storage.getTastingRecords(undefined, 1, PAGE_LIMIT);
+    // 透传目标豆子ID给后端，只查询该豆的品饮记录，避免全量第一页后前端过滤导致早期记录匹配不到
+    const recordsResult = await storage.getTastingRecords(targetBeanId.value || undefined, 1, PAGE_LIMIT);
     const beansResult = await storage.getBeans(1, 1000);
     records.value = recordsResult.data;
     beans.value = beansResult.data;
@@ -231,13 +232,16 @@ const loadData = async () => {
     totalRecords.value = recordsResult.pagination.total;
   } catch (error) {
     console.error('Failed to load data:', error);
-    records.value = localCache.getTastingRecords().slice(0, PAGE_LIMIT);
+    const cachedRecords = localCache.getTastingRecords();
+    records.value = targetBeanId.value
+      ? cachedRecords.filter(r => r.beanId === targetBeanId.value).slice(0, PAGE_LIMIT)
+      : cachedRecords.slice(0, PAGE_LIMIT);
     beans.value = localCache.getBeans();
     selectedBeanDetail.value = targetBeanId.value
       ? localCache.getBeans().find(b => b.id === targetBeanId.value) || null
       : null;
-    hasMore.value = localCache.getTastingRecords().length > PAGE_LIMIT;
-    totalRecords.value = localCache.getTastingRecords().length;
+    hasMore.value = cachedRecords.length > PAGE_LIMIT;
+    totalRecords.value = cachedRecords.length;
   } finally {
     loading.value = false;
   }
@@ -249,7 +253,8 @@ const loadMoreRecords = async () => {
   loading.value = true;
   try {
     const nextPage = currentPage.value + 1;
-    const recordsResult = await storage.getTastingRecords(undefined, nextPage, PAGE_LIMIT);
+    // 与 loadData 保持一致，透传目标豆子ID给后端
+    const recordsResult = await storage.getTastingRecords(targetBeanId.value || undefined, nextPage, PAGE_LIMIT);
     
     if (recordsResult.data.length > 0) {
       records.value = [...records.value, ...recordsResult.data];
@@ -474,6 +479,8 @@ const chooseBean = () => {
           selectedBeanDetail.value = bean;
         }
       }
+      // 刷新品饮记录：按所选豆子重新向后端查询
+      loadData();
     }
   });
 };

@@ -11,7 +11,7 @@ if (!JWT_SECRET) {
   console.error('❌ JWT_SECRET 环境变量未设置，请在 Vercel 控制台中配置');
 }
 
-const JWT_EXPIRES_IN = '7d';
+const JWT_EXPIRES_IN = '30d';
 
 // 用户接口
 interface User {
