@@ -93,9 +93,23 @@
 | `beans.ts`                                 | `/api/beans`     | 咖啡豆 CRUD 操作，带用户隔离    |
 | `inventory.ts`                             | `/api/inventory` | 出入库记录 CRUD           |
 | `tasting.ts`                               | `/api/tasting`   | 品饮记录 CRUD（支持更新）      |
+| `stats.ts`                                 | `/api/stats`     | 数据分析接口（月度出入库 / 产地分布 / 消耗周期） |
 | `db.ts`                                    | 内部模块             | 数据库连接管理，环境切换         |
 | `ping.ts`                                  | `/api/ping`      | 健康检查接口               |
 | `test.ts` / `simple-test.ts` / `verify.ts` | 测试接口             | 开发和调试用               |
+
+#### **📊 统计接口 `/api/stats`**（数据分析）
+
+鉴权：需要请求头 `Authorization: Bearer <token>`，自动按当前登录用户过滤数据。
+
+| 查询参数 | 说明 | 返回结构 |
+| -------- | ---- | -------- |
+| （无） / `type=all` | 一次性返回三类统计 | `{ success, monthly, countries, depleted }` |
+| `type=monthly` | 每月出入库（豆种数 / 克数） | `{ success, data: [{ ym, inCnt, outCnt, inBeans, outBeans, inGrams, outGrams }] }` |
+| `type=countries` | 各国咖啡豆数量与当前库存 | `{ success, data: [{ country, beans, stockGrams }] }` |
+| `type=depleted` | 已无库存豆子的消耗周期 | `{ success, data: [{ id, name, country, firstOut, lastOut, spanDays, outGrams, inGrams }] }` |
+
+调用示例：`GET /api/stats?type=monthly`
 
 **关键特性**：
 
@@ -242,6 +256,7 @@ App.vue 中定义了完整的设计令牌：
 - **咖啡豆 API**: `api/beans.ts:1`
 - **出入库 API**: `api/inventory.ts:1`
 - **品饮 API**: `api/tasting.ts:1`
+- **统计 API**: `api/stats.ts:1`
 - **登录认证**: `api/login.ts:1` → `api/auth.ts:1`
 
 ### 数据库

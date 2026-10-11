@@ -6,6 +6,7 @@ declare const uni: {
   switchTab(options: { url: string }): void;
   navigateTo(options: { url: string }): void;
   navigateBack(options?: { delta: number }): void;
+  reLaunch(options: { url: string }): void;
   showToast(options: { title: string; icon?: string }): void;
   showModal(options: {
     title: string;
@@ -27,3 +28,6 @@ declare const uni: {
     fail?(err: any): void;
   }): void;
 };
+
+// uni-app 页面栈全局函数
+declare function getCurrentPages(): Array<{ route?: string } & Record<string, any>>;
